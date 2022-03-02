@@ -46,16 +46,3 @@ games = ['3-move parity game 2.pkl', '5,4-Blotto.pkl', 'AlphaStar.pkl', 'connect
          'go(board_size=3,komi=6.5).pkl', 'misere(game=tic_tac_toe()).pkl', 'Normal Bernoulli game.pkl',  'quoridor(board_size=3).pkl',  'Random game of skill.pkl', 
          'tic_tac_toe.pkl',    'Transitive game.pkl',    'Triangular game.pkl']
 ```
-
-
-## Leduc Poker
-
-<img src="results/leduc.png" width="500" >
-
-## Kuhn Poker
-
-<img src="results/kuhn.png" width="500" >
-
-## Payoffs against a MWU adversary
-
-<img src="results/vs_mwu.png" width="500" >
