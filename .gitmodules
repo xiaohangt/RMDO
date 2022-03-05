@@ -1,0 +1,3 @@
+[submodule "xodo/dependencies/open_spiel"]
+	path = xodo/dependencies/open_spiel
+	url = https://github.com/xiaohangt/open_spiel/tree/personal_plus_upstream
