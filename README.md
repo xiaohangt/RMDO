@@ -41,7 +41,7 @@ python experiments.py -g kuhn_poker -a psro
 ```
 Results will be saved in the folder `results` as list. An example result of exploitability in terms of wall time:
 
-<img src="results/kuhn_poker_time.png" width="500" >
+<img src="results/kuhn_poker_time.png" width="500"/>
 
 To run experiments on  Leduc Poker, Dummy Leduc Poker, Oshi Zumo, just need to replace the argument `kuhn_poker` to `leduc_poker`, `leduc_poker_dummy`, `oshi_zumo`
 
