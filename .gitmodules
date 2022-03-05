@@ -1,3 +1,0 @@
-[submodule "dependencies/open_spiel"]
-	path = dependencies/open_spiel
-	url = https://github.com/xiaohangt/open_spiel/tree/personal_plus_upstream
