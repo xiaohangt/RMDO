@@ -31,17 +31,19 @@ pip install -e . # This will start a compilation process. Will take a few minute
 
 ## Running Experiments
 ### Exploitability
-To run Extensive-Form Online Double Oracle (with CFR+ as meta solver) and other baselines on Kuhn Poker:
+To run Extensive-Form Online Double Oracle (with CFR+ as meta solver):
 ```commandline
 python rmdo.py --game kuhn_poker --algorithm XODO --meta_solver cfr_plus
 ```
 
-To run Extensive-Form Double Oracle (with CFR+ as meta solver) and other baselines on Kuhn Poker:
+To run Extensive-Form Double Oracle (with CFR+ as meta solver) and other baselines.
 ```commandline
 python baselines.py --game kuhn_poker --algorithm dxdo
+python baselines.py --game kuhn_poker --algorithm cfr
+python baselines.py --game kuhn_poker --algorithm xfp
 ```
 
-To run Periodic Double Oracle (with CFR+ as meta solver) and other baselines on Kuhn Poker:
+To run Periodic Double Oracle (with CFR+ as meta solver):
 ```commandline
 python rmdo.py --game kuhn_poker --algorithm PDO --meta_solver cfr_plus --meta_iterations 50
 ```
