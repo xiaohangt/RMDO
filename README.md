@@ -1,23 +1,27 @@
 # Regret-Minimizing Double Oracle for Extensive-Form Games
 
-This repository is the implementation of the paper Regret-Minimizing Double Oracle for Extensive-Form Games. 
+This repository is the official implementation of the paper Regret-Minimizing Double Oracle for Extensive-Form Games. 
 
 ## Before running
 ### Clone the repo with git submodules
-```
-git clone --recursive https://github.com/xiaohangt/ODO.git
-cd ODO
+```commandline
+git clone --recursive https://github.com/xiaohangt/RMDO.git
+cd RMDO
 git submodule update --init --recursive
 ```
 
 ### Set up environments:
-```
-conda env create -f environment.yml
+```commandline
+conda env create -f environment.yaml
 conda activate xodo
+```
+or
+```commandline
+pip install -r requirements.txt
 ```
 
 ### Install dependency(OpenSpiel)
-```
+```commandline
 # Starting at the repo root
 cd dependencies/open_spiel
 export BUILD_WITH_ACPC=ON # to compile with the optional universal poker game variant
@@ -27,13 +31,19 @@ pip install -e . # This will start a compilation process. Will take a few minute
 
 ## Running Experiments
 ### Exploitability
-To run Extensive-Form Online Double Oracle(with Linear CFR+ as meta solver) and other baselines on Kuhn Poker:
+To run Extensive-Form Online Double Oracle (with CFR+ as meta solver) and other baselines on Kuhn Poker:
+```commandline
+python rmdo.py --game kuhn_poker --algorithm XODO --meta_solver cfr_plus
 ```
-python experiments.py -g kuhn_poker -a xodo -m lcfr_plus
-python experiments.py -g kuhn_poker -a xdo -m lcfr_plus
-python experiments.py -g kuhn_poker -a lcfr_plus
-python experiments.py -g kuhn_poker -a lcfr
-python experiments.py -g kuhn_poker -a xfp
-python experiments.py -g kuhn_poker -a psro
+
+To run Extensive-Form Double Oracle (with CFR+ as meta solver) and other baselines on Kuhn Poker:
+```commandline
+python baselines.py --game kuhn_poker --algorithm dxdo
 ```
+
+To run Periodic Double Oracle (with CFR+ as meta solver) and other baselines on Kuhn Poker:
+```commandline
+python rmdo.py --game kuhn_poker --algorithm PDO --meta_solver cfr_plus --meta_iterations 50
+```
+
 Results will be saved in the folder `results` as list.

@@ -210,7 +210,7 @@ class XODO:
         return game
 
     def reset_meta_solver(self, restricted_game):
-        if self.meta_solver == 'cfr+':
+        if self.meta_solver == 'cfr_plus':
             meta_solver = cfr.CFRPlusSolver(restricted_game)
         elif self.meta_solver == 'cfr':
             meta_solver = cfr.CFRSolver(restricted_game)
@@ -322,7 +322,7 @@ if __name__ == '__main__':
     parser.add_argument('--algorithm', type=str, choices=["XODO", "PDO"],
                         required=False, default="PDO")
     parser.add_argument('--meta_iterations', type=int, required=False, default=50)
-    parser.add_argument('--meta_solver', type=int, required=False, default="cfr+")
+    parser.add_argument('--meta_solver', type=int, required=False, default="cfr_plus")
     parser.add_argument('--seed', type=int, required=False, default=0)
     parser.add_argument('--game_name', type=str, required=False, default="kuhn_poker",
                         choices=["leduc_poker", "kuhn_poker", "leduc_poker_dummy", "oshi_zumo", "liars_dice",
