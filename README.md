@@ -1,6 +1,6 @@
 # Regret-Minimizing Double Oracle for Extensive-Form Games
 
-This repository is the official implementation of the paper "Regret-Minimizing Double Oracle for Extensive-Form Games", ICML 2023. [paper](https://arxiv.org/abs/2304.10498).
+This repository is the official implementation of the paper "Regret-Minimizing Double Oracle for Extensive-Form Games", ICML 2023. [[paper](https://arxiv.org/abs/2304.10498)]
 
 ## Before running
 ### Clone the repo with git submodules
