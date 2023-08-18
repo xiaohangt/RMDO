@@ -23,7 +23,7 @@ pip3 install -r requirements.txt
 ### Install dependency(OpenSpiel)
 ```commandline
 # Starting at the repo root
-cd dependencies/open_spiel
+cd dependencies
 export BUILD_WITH_ACPC=ON # to compile with the optional universal poker game variant
 ./install.sh
 pip3 install -e . # This will start a compilation process. Will take a few minutes.
