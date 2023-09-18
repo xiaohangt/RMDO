@@ -11,13 +11,16 @@ import numpy as np
 import pyspiel
 import blotto
 import large_kuhn_poker
-from dependencies.open_spiel.open_spiel.python.algorithms import cfr
-from dependencies.open_spiel.open_spiel.python.algorithms import cfr_br_actions
-from dependencies.open_spiel.open_spiel.python.algorithms import exploitability
-from dependencies.open_spiel.open_spiel.python.algorithms import exploitability_br_actions
-from dependencies.open_spiel.open_spiel.python.algorithms import fictitious_play
-from dependencies.open_spiel.open_spiel.python.algorithms import outcome_sampling_mccfr
-from dependencies.open_spiel.open_spiel.python.algorithms import psro_oracle
+from utils import get_support
+
+from dependencies.open_spiel.python.algorithms import cfr
+from dependencies.open_spiel.python.algorithms import discounted_cfr
+from dependencies.open_spiel.python.algorithms import cfr_br_actions
+from dependencies.open_spiel.python.algorithms import exploitability
+from dependencies.open_spiel.python.algorithms import exploitability_br_actions
+from dependencies.open_spiel.python.algorithms import fictitious_play
+from dependencies.open_spiel.python.algorithms import outcome_sampling_mccfr
+from dependencies.open_spiel.python.algorithms import psro_oracle
 
 
 def ensure_dir(file_path):
@@ -65,7 +68,7 @@ def _policy_dict_at_state(callable_policy, state):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     # dxdo is xdo with meta_solver cfr+
-    parser.add_argument('--algorithm', type=str, choices=["psro", "cfr", "xfp", "xdo", "dxdo", "cfr_plus"], default="xdo")
+    parser.add_argument('--algorithm', type=str, choices=["psro", "cfr", "xfp", "xdo", "dxdo", "cfr_plus", "lcfr"], default="xdo")
     parser.add_argument('--game_name', type=str, required=False, default="kuhn_poker",
                         choices=["leduc_poker", "kuhn_poker", "leduc_poker_dummy", "oshi_zumo",  "liars_dice",
                                  "goofspiel", "phantom_ttt", "blotto", "python_large_kuhn_poker"])
@@ -109,6 +112,7 @@ if __name__ == '__main__':
     xdo_iterations = 200000
     random_max_br = False
 
+
     def run(solver, iterations):
         start_time = time.time()
         times = []
@@ -117,13 +121,13 @@ if __name__ == '__main__':
         cfr_infostates = []
         for i in range(iterations):
             # display_policy(solver.average_policy())
-            if algorithm == 'cfr' or algorithm == 'cfr_plus':
+            if algorithm == 'cfr' or algorithm == 'cfr_plus' or algorithm == "lcfr":
                 solver.evaluate_and_update_policy()
             else:
                 solver.iteration()
             if i % 5 == 0:
                 print(algorithm)
-                if algorithm == 'cfr' or algorithm == 'cfr_plus' or algorithm == 'outcome_sampling_mccfr':
+                if 'cfr' in algorithm:
                     average_policy = solver.average_policy()
                 elif algorithm == 'xfp':
                     average_policy = solver.average_policy()
@@ -139,7 +143,7 @@ if __name__ == '__main__':
                 times.append(elapsed_time)
                 exps.append(conv)
                 episodes.append(i)
-                save_prefix = './results/' + algorithm + '_' + game_name + f"_{seed}_"
+                save_prefix = '/root/data/results/' + algorithm + '_' + game_name + f"_{seed}_"
                 ensure_dir(save_prefix)
                 print(f"saving to: {save_prefix + '_times.npy'}")
                 np.save(save_prefix + '_times', np.array(times))
@@ -152,12 +156,19 @@ if __name__ == '__main__':
                 print(f"saving to: {save_prefix + '_infostates.npy'}")
                 np.save(save_prefix + '_infostates', np.array(cfr_infostates))
 
+                support = get_support(average_policy, game)
+                print("Support:", support)
+                print(f"saving to: {save_prefix + '_infos.npy'}")
+                np.save(save_prefix + '_infos', [support])
 
     if algorithm == 'cfr':
         solver = cfr.CFRSolver(game)
         run(solver, iterations)
     elif algorithm == 'cfr_plus':
         solver = cfr.CFRPlusSolver(game)
+        run(solver, iterations)
+    elif algorithm == "lcfr":
+        solver = discounted_cfr.LCFRSolver(game)
         run(solver, iterations)
     elif algorithm == 'outcome_sampling_mccfr':
         solver = outcome_sampling_mccfr.OutcomeSamplingSolver(game)
@@ -241,6 +252,8 @@ if __name__ == '__main__':
                 np.save(save_prefix + '_times', np.array(xdo_times))
                 np.save(save_prefix + '_exps', np.array(xdo_exps))
                 np.save(save_prefix + '_infostates', np.array(xdo_infostates))
+
+                np.save(save_prefix + '_infos', [get_support(average_policy, game)])
     elif algorithm == 'psro':
         brs = []
         info_test = []

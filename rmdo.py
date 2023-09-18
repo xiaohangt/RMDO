@@ -8,22 +8,17 @@ import numpy as np
 from copy import deepcopy
 import blotto
 import large_kuhn_poker
+from utils import get_support, ensure_dir, merge_two_policies   
 
-from dependencies.open_spiel.open_spiel.python import policy
-from dependencies.open_spiel.open_spiel.python.algorithms import cfr
-from dependencies.open_spiel.open_spiel.python.algorithms import best_response
-from dependencies.open_spiel.open_spiel.python.algorithms import exploitability
-from dependencies.open_spiel.open_spiel.python.algorithms import outcome_sampling_mccfr as outcome_mccfr
+from dependencies.open_spiel.python import policy
+from dependencies.open_spiel.python.algorithms import cfr
+from dependencies.open_spiel.python.algorithms import best_response
+from dependencies.open_spiel.python.algorithms import exploitability
+from dependencies.open_spiel.python.algorithms import outcome_sampling_mccfr as outcome_mccfr
 
 module_path = os.path.abspath(os.path.join(''))
 if module_path not in sys.path:
     sys.path.append(module_path)
-
-
-def ensure_dir(file_path):
-    directory = os.path.dirname(file_path)
-    if not os.path.exists(directory):
-        os.makedirs(directory, exist_ok=True)
 
 
 class WrappedOSMCCFRSolver(outcome_mccfr.OutcomeSamplingSolver):
@@ -105,83 +100,15 @@ class ExpandTabularPolicy:
         return {a: 1 / len(state.legal_actions()) for a in state.legal_actions()}
 
 
-def merge_two_policies(previous_policy, current_policy, iter, prev_iter):
-    """Merges two policies(one is the other's subset) into single joint policy for fixed player.
-
-    Missing states are filled with a valid uniform policy.
-
-    Args:
-      current_policy: avg policy of current window
-      previous_policy: avg policy of previous windows
-      game: The game corresponding to the resulting TabularPolicy.
-      iter: Useful in uniform average
-
-
-    Returns:
-      merged_policy: A TabularPolicy with each player i's policy taken from the
-        ith joint_policy.
-    """
-    merged_policy = current_policy
-    for p_state in current_policy.state_lookup.keys():
-        to_index = merged_policy.state_lookup[p_state]
-        # Only copy if the state exists, otherwise fall back onto uniform.
-        current_prob_array = current_policy.action_probability_array[current_policy.state_lookup[p_state]]
-        if p_state in previous_policy.state_lookup:
-            previous_prob_array = previous_policy.action_probability_array[
-                previous_policy.state_lookup[p_state]]
-            merged_policy.action_probability_array[to_index] = (previous_prob_array * prev_iter + current_prob_array * (
-                    iter - prev_iter)) / iter
-        else:
-            merged_policy.action_probability_array[to_index] = current_prob_array
-        merged_policy.action_probability_array[to_index] /= np.sum(
-            merged_policy.action_probability_array[to_index])
-    return merged_policy
-
-
-def merge_policies(policies, windows, cur_it, gap=1):
-    """Merges two policies(one is the other's subset) into single joint policy for fixed player.
-
-    Missing states are filled with a valid uniform policy.
-
-    Args:
-      current_policy: avg policy of current window
-      previous_policy: avg policy of previous windows
-      game: The game corresponding to the resulting TabularPolicy.
-      iter: Useful in uniform average
-
-
-    Returns:
-      merged_policy: A TabularPolicy with each player i's policy taken from the
-        ith joint_policy.
-    """
-    merged_policy = policies[-1]
-    for p_state in policies[-1].state_lookup.keys():
-        to_index = merged_policy.state_lookup[p_state]
-        merged_policy.action_probability_array[to_index] *= ((cur_it - windows[-1]) * gap)
-
-        # Only copy if the state exists, otherwise fall back onto uniform.
-        for i, tabular_policy in enumerate(policies[:-1]):
-            if p_state in tabular_policy.state_lookup:
-                tabular_policy_array = tabular_policy.action_probability_array[
-                    tabular_policy.state_lookup[p_state]]
-                merged_policy.action_probability_array[to_index] += (
-                        gap * (windows[i + 1] - windows[i]) * tabular_policy_array)
-            else:
-                merged_policy.action_probability_array[to_index] += 0
-        merged_policy.action_probability_array[to_index] /= np.sum(
-            merged_policy.action_probability_array[to_index])
-
-    return merged_policy
-
-
 class XODO:
     def __init__(self, algorithm: str, game_name: str, meta_iterations: int, data_collect_frequency: int,
-                 meta_solver: str):
+                 meta_solver: str, is_warm_start: bool):
         self.algorithm = algorithm
         self.game_name = game_name
         self.meta_solver = meta_solver
         self.meta_iterations = meta_iterations
         self.data_collect_frequency = data_collect_frequency
+        self.is_warm_start = is_warm_start
 
     def reset_game(self):
         # Set up game environment
@@ -208,14 +135,40 @@ class XODO:
         else:
             game = pyspiel.load_game(self.game_name)
         return game
+    
+    def warm_star_init(self, state, old_solver, new_solver):
+        if state.is_terminal():
+            return
 
-    def reset_meta_solver(self, restricted_game):
+        if state.is_chance_node():
+            for action, unused_action_prob in state.chance_outcomes():
+                new_solver.warm_star_init(state.child(action), old_solver, new_solver)
+            return
+
+        current_player = state.current_player()
+        info_state = state.information_state_string(current_player)
+
+        info_state_node = new_solver._info_state_nodes.get(info_state)
+        old_info_state_node = old_solver._info_state_nodes.get(info_state)
+
+        assert info_state_node is not None
+        for action in info_state_node.legal_actions:
+            if old_info_state_node and (action in old_info_state_node.cumulative_regret):
+                info_state_node.cumulative_regret[action] = old_info_state_node.cumulative_regret[action]
+            new_solver.warm_star_init(state.child(action), old_solver, new_solver)
+
+    def reset_meta_solver(self, restricted_game, warm_start=False, old_solver=None):        
         if self.meta_solver == 'cfr_plus':
             meta_solver = cfr.CFRPlusSolver(restricted_game)
         elif self.meta_solver == 'cfr':
             meta_solver = cfr.CFRSolver(restricted_game)
         else:
             raise ValueError("Algorithm unidentified")
+        
+        if (not old_solver) or (not warm_start):
+            return meta_solver
+
+        self.warm_star_init(restricted_game.new_initial_state(), old_solver, meta_solver)
         return meta_solver
 
     def run(self, game, iterations, seed):
@@ -254,7 +207,7 @@ class XODO:
             else:
                 avg_policy = current_window_policy
             conv = exploitability.exploitability(game, avg_policy)
-            save_prefix = './results/' + self.algorithm + str(self.meta_iterations) + '_' + self.game_name + f'_{seed}'
+            save_prefix = f'/root/data/results/{self.game_name}_{self.algorithm}_{str(self.meta_iterations)}_ws{self.is_warm_start}_{seed}'
 
             if (new_br and i > 0) or i % self.data_collect_frequency == 0:
                 print("Iteration {} exploitability {}".format(i, conv))
@@ -267,11 +220,11 @@ class XODO:
                     np.save(save_prefix + '_times', np.array(xodo_times))
                     np.save(save_prefix + '_exps', np.array(xodo_exps))
                     np.save(save_prefix + '_infostates', np.array(xodo_infostates))
+                    np.save(save_prefix + '_infos', [k, xodo_exps[-1], get_support(avg_policy, game)]) # k, the lowest exp and support
 
             # If there is new BR, construct meta-game, increase window count and reset strategy
             if new_br:
                 k += 1
-                np.save(save_prefix + '_k', np.array(k, xodo_exps[-1]))
 
             if new_br and i > 0:
                 restricted_game = MetaGame(game, br_list)
@@ -322,8 +275,10 @@ if __name__ == '__main__':
     parser.add_argument('--algorithm', type=str, choices=["XODO", "PDO"],
                         required=False, default="PDO")
     parser.add_argument('--meta_iterations', type=int, required=False, default=50)
-    parser.add_argument('--meta_solver', type=int, required=False, default="cfr_plus")
-    parser.add_argument('--seed', type=int, required=False, default=0)
+    parser.add_argument('--iterations', type=int, required=False, default=10000)
+    parser.add_argument('--meta_solver', type=str, required=False, default="cfr_plus")
+    parser.add_argument('-w', '--is_warm_start', action='store_true')  # on/off flag
+    parser.add_argument('--seed', type=int, required=False, default=0) 
     parser.add_argument('--game_name', type=str, required=False, default="kuhn_poker",
                         choices=["leduc_poker", "kuhn_poker", "leduc_poker_dummy", "oshi_zumo", "liars_dice",
                                  "goofspiel", "python_large_kuhn_poker",
@@ -333,19 +288,22 @@ if __name__ == '__main__':
     seed = commandline_args.seed
     algorithm = commandline_args.algorithm
     game_name = commandline_args.game_name
+    iterations = commandline_args.iterations
     meta_iterations = commandline_args.meta_iterations if algorithm != "XODO" else 1
     meta_solver = commandline_args.meta_solver
+    is_warm_start = commandline_args.is_warm_start
 
-    # Adjust the iterations you want
-    iterations = int(10000 / meta_iterations)
     data_collect_frequency = 10
     np.random.seed(seed)
-    print(algorithm, game_name, meta_iterations, iterations, data_collect_frequency, seed)
+
+    print(vars(commandline_args))
+    # print(algorithm, game_name, meta_iterations, iterations, data_collect_frequency, seed, is_warm_start)
 
     xodo = XODO(algorithm=algorithm,
                 game_name=game_name,
                 meta_iterations=meta_iterations,
                 data_collect_frequency=data_collect_frequency,
-                meta_solver=meta_solver)
+                meta_solver=meta_solver,
+                is_warm_start=is_warm_start)
     game = xodo.reset_game()
     xodo.run(game, iterations, seed)
