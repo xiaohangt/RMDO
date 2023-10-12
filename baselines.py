@@ -68,10 +68,10 @@ def _policy_dict_at_state(callable_policy, state):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     # dxdo is xdo with meta_solver cfr+
-    parser.add_argument('--algorithm', type=str, choices=["psro", "cfr", "xfp", "xdo", "dxdo", "cfr_plus", "lcfr"], default="xdo")
+    parser.add_argument('--algorithm', type=str, choices=["psro", "cfr", "xfp", "xdo", "dxdo", "cfr_plus", "lcfr", "outcome_sampling_mccfr"], default="outcome_sampling_mccfr")
     parser.add_argument('--game_name', type=str, required=False, default="kuhn_poker",
                         choices=["leduc_poker", "kuhn_poker", "leduc_poker_dummy", "oshi_zumo",  "liars_dice",
-                                 "goofspiel", "phantom_ttt", "blotto", "python_large_kuhn_poker"])
+                                 "goofspiel", "havannah", "blotto", "python_large_kuhn_poker"])
     parser.add_argument('--display', type=bool, default=False)
     parser.add_argument('--seed', type=int, required=False, default=0)
 
@@ -98,7 +98,7 @@ if __name__ == '__main__':
     elif game_name == "goofspiel":
         game = pyspiel.load_game(game_name, {"players": pyspiel.GameParameter(2)})
         game = pyspiel.convert_to_turn_based(game)
-    elif game_name == "phantom_ttt":
+    elif game_name == "havannah":
         game = pyspiel.load_game(game_name)
     elif game_name == "blotto":
         game = blotto.BlottoGame()
@@ -246,14 +246,14 @@ if __name__ == '__main__':
                 num_infostates += br_info["expanded_infostates"]
 
             br_list.append(brs)
-            save_prefix = './results/' + algorithm + '_' + game_name + '_random_br_' + str(random_max_br) + extra_info
+            save_prefix = '/root/data/results/' + algorithm + '_' + game_name + f"_{seed}_"
             ensure_dir(save_prefix)
             if time.time() - start_time < 258000:
                 np.save(save_prefix + '_times', np.array(xdo_times))
                 np.save(save_prefix + '_exps', np.array(xdo_exps))
                 np.save(save_prefix + '_infostates', np.array(xdo_infostates))
 
-                np.save(save_prefix + '_infos', [get_support(average_policy, game)])
+                np.save(save_prefix + '_infos', [get_support(cfr_br_solver.average_policy(), game)])
     elif algorithm == 'psro':
         brs = []
         info_test = []
