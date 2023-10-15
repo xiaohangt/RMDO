@@ -12,14 +12,13 @@ import blotto
 import pdb
 
 import large_kuhn_poker
-from dependencies.open_spiel.open_spiel.python.games import tic_tac_toe
-from dependencies.open_spiel.open_spiel.python.games import kuhn_poker
-
-from dependencies.open_spiel.open_spiel.python import policy
-from dependencies.open_spiel.open_spiel.python.algorithms import cfr
-from dependencies.open_spiel.open_spiel.python.algorithms import best_response
-from dependencies.open_spiel.open_spiel.python.algorithms import exploitability
-from dependencies.open_spiel.open_spiel.python.algorithms import outcome_sampling_mccfr as outcome_mccfr
+from dependencies.open_spiel.python.games import tic_tac_toe
+from dependencies.open_spiel.python.games import kuhn_poker
+from dependencies.open_spiel.python import policy
+from dependencies.open_spiel.python.algorithms import cfr
+from dependencies.open_spiel.python.algorithms import best_response
+from dependencies.open_spiel.python.algorithms import exploitability
+from dependencies.open_spiel.python.algorithms import outcome_sampling_mccfr as outcome_mccfr
 
 from approximate_best_response import MCBR, BestResponseWrapper
 
@@ -63,13 +62,12 @@ class MetaState:
             legal_actions = set()
             for br in self.brs[self.state.current_player()]:
                 try:
-                    br.update_legal_actions(self.state)
+                    # br.update_legal_actions(self.state)
                     legal_actions.add(br.best_response_action(self.state.information_state_string()))
                 except:
                     pdb.set_trace()
 
             ans = list(legal_actions)
-            
             self.game._legal_actions_cache[self.state.history_str()] = ans
             return ans
         else:
@@ -159,12 +157,13 @@ def display_policy(current_policy):
 
 
 
-class XODO:
-    def __init__(self, algorithm: str, game_name: str, xodo_iterations: int, data_collect_frequency: int):
+class SPDO:
+    def __init__(self, algorithm: str, game_name: str, meta_iterations: int, data_collect_frequency: int, is_warm_start: bool):
         self.algorithm = algorithm
         self.game_name = game_name
-        self.xodo_iterations = xodo_iterations
+        self.meta_iterations = meta_iterations
         self.data_collect_frequency = data_collect_frequency
+        self.is_warm_start = is_warm_start
         self.br_actions = {}
         self.state_str_to_legal_actions = {}
 
@@ -194,11 +193,36 @@ class XODO:
             game = pyspiel.load_game(self.game_name)
         return game
 
-    def reset_meta_solver(self, restricted_game):
+    def warm_star_init(self, old_solver, new_solver, br_list):
+        for key, legal_action_value in old_solver.legal_actions_dict.items():
+            cur_player, old_legal_actions = legal_action_value
+
+            legal_actions = set()
+            for br in br_list[cur_player]:
+                legal_actions.add(br.best_response_action(key))
+            legal_actions = list(legal_actions)
+
+            new_solver._infostates[key] = [
+                np.ones(len(legal_actions), dtype=np.float64) / 1e6, # cum regret
+                np.ones(len(legal_actions), dtype=np.float64) / 1e6, # cum strategy
+            ]
+
+            value = old_solver._infostates[key]
+            count = 0
+            for i, action in enumerate(legal_actions):
+                if action in old_legal_actions:
+                    new_solver._infostates[key][0][i] = value[0][count] / self.meta_iterations
+                    count += 1
+            
+    def reset_meta_solver(self, restricted_game, br_list=None, old_solver=None):
         meta_solver = WrappedOSMCCFRSolver(restricted_game)
+        if (not old_solver) or (not self.is_warm_start):
+            return meta_solver
+
+        self.warm_star_init(old_solver, meta_solver, br_list)
         return meta_solver
     
-    def get_best_response(self, game, policy, exact_br=False):
+    def get_best_response(self, game, policy, exact_br=True):
         brs = []
         new_br = False
         num_infostates_expanded = 0
@@ -258,7 +282,7 @@ class XODO:
             avg_policy = current_window_policy
 
             conv = exploitability.exploitability(game, avg_policy)
-            save_prefix = './results/' + self.algorithm + str(self.xodo_iterations) + '_' + self.game_name + f'_{seed}'
+            save_prefix = f'/root/data/results/{self.game_name}_{self.algorithm}_{self.meta_iterations}_ws{self.is_warm_start}_{seed}'
 
             if (new_br and i > 0) or i % self.data_collect_frequency == 0:
                 # print(avg_policy.action_probability_array)
@@ -277,7 +301,8 @@ class XODO:
                 # If there is new BR, construct meta-game, increase window count and reset strategy
                 k += 1
                 restricted_game = MetaGame(game, br_list, it=i)
-                meta_solver = self.reset_meta_solver(restricted_game)
+                old_meta_solver = meta_solver
+                meta_solver = self.reset_meta_solver(restricted_game, br_list, old_meta_solver)
                 if previous_avg_policy:
                     del previous_avg_policy
                 prev_iter = i
@@ -287,7 +312,7 @@ class XODO:
 
             # Run meta-strategy updates
             meta_solver.num_infostates_expanded = 0
-            for _ in range(self.xodo_iterations):
+            for _ in range(self.meta_iterations):
                 meta_solver.evaluate_and_update_policy()
             num_infostates += meta_solver.num_infostates_expanded
 
@@ -307,26 +332,29 @@ class XODO:
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--algorithm', type=str, choices=["SDO"],
-                        required=False, default="SDO")
-    parser.add_argument('--xodo_iterations', type=int, required=False, default=500)
+    parser.add_argument('--algorithm', type=str, choices=["SPDO"],
+                        required=False, default="SPDO")
+    parser.add_argument('--meta_iterations', type=int, required=False, default=500)
     parser.add_argument('--seed', type=int, required=False, default=0)
+    parser.add_argument('-w', '--is_warm_start', action='store_true')  # on/off flag
     parser.add_argument('--game_name', type=str, required=False, default="kuhn_poker",
                         choices=["leduc_poker", "kuhn_poker", "leduc_poker_dummy", "oshi_zumo", "liars_dice",
-                                 "goofspiel", "python_large_kuhn_poker",
-                                 "phantom_ttt", "blotto"])
+                                 "python_large_kuhn_poker",
+                                 "blotto"])
     commandline_args = parser.parse_args()
 
     seed = commandline_args.seed
     algorithm = commandline_args.algorithm
     game_name = commandline_args.game_name
-    xodo_iterations = commandline_args.xodo_iterations
-    iterations = int(10000000 / xodo_iterations)
+    meta_iterations = commandline_args.meta_iterations
+    iterations = 10000
     data_collect_frequency = 10
-    print(algorithm, game_name, xodo_iterations, iterations, data_collect_frequency, seed)
+    is_warm_start = commandline_args.is_warm_start
+
+    print(vars(commandline_args))
 
     np.random.seed(seed)
-    xodo = XODO(algorithm, game_name, xodo_iterations, data_collect_frequency)
-    game = xodo.reset_game()
-    xodo.run(game, iterations, seed)
+    algo = SPDO(algorithm, game_name, meta_iterations, data_collect_frequency, is_warm_start)
+    game = algo.reset_game()
+    algo.run(game, iterations, seed)
 

@@ -22,7 +22,7 @@ def get_support(policy, game):
             traverse(state.child(action))
     
     traverse(game.new_initial_state())
-    return np.mean(supports)
+    return np.mean(supports), np.sum(supports)
 
 
 def ensure_dir(file_path):

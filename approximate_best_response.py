@@ -13,16 +13,16 @@ from collections import defaultdict
 
 import blotto
 import large_kuhn_poker
-from dependencies.open_spiel.open_spiel.python.games import tic_tac_toe
-from dependencies.open_spiel.open_spiel.python.games import kuhn_poker
+from dependencies.open_spiel.python.games import tic_tac_toe
+from dependencies.open_spiel.python.games import kuhn_poker
 
-from dependencies.open_spiel.open_spiel.python import policy
-from dependencies.open_spiel.open_spiel.python.algorithms import cfr
-from dependencies.open_spiel.open_spiel.python.algorithms import mccfr
-from dependencies.open_spiel.open_spiel.python.algorithms import exploitability
-from dependencies.open_spiel.open_spiel.python.algorithms import get_all_states
-from dependencies.open_spiel.open_spiel.python.algorithms import outcome_sampling_mccfr as outcome_mccfr
-from dependencies.open_spiel.open_spiel.python.algorithms.best_response import _memoize_method
+from dependencies.open_spiel.python import policy
+from dependencies.open_spiel.python.algorithms import cfr
+from dependencies.open_spiel.python.algorithms import mccfr
+from dependencies.open_spiel.python.algorithms import exploitability
+from dependencies.open_spiel.python.algorithms import get_all_states
+from dependencies.open_spiel.python.algorithms import outcome_sampling_mccfr as outcome_mccfr
+from dependencies.open_spiel.python.algorithms.best_response import _memoize_method
 
 class BestResponseWrapper():
     def __init__(self, br_policy):

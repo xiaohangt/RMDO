@@ -102,13 +102,15 @@ class ExpandTabularPolicy:
 
 class XODO:
     def __init__(self, algorithm: str, game_name: str, meta_iterations: int, data_collect_frequency: int,
-                 meta_solver: str, is_warm_start: bool):
+                 meta_solver: str, is_warm_start: bool, warm_start_discount=1, is_weak_warm_start=False):
         self.algorithm = algorithm
         self.game_name = game_name
         self.meta_solver = meta_solver
         self.meta_iterations = meta_iterations
         self.data_collect_frequency = data_collect_frequency
         self.is_warm_start = is_warm_start
+        self.warm_start_discount = warm_start_discount
+        self.is_weak_warm_start = is_weak_warm_start
 
     def reset_game(self):
         # Set up game environment
@@ -142,7 +144,7 @@ class XODO:
 
         if state.is_chance_node():
             for action, unused_action_prob in state.chance_outcomes():
-                new_solver.warm_star_init(state.child(action), old_solver, new_solver)
+                self.warm_star_init(state.child(action), old_solver, new_solver)
             return
 
         current_player = state.current_player()
@@ -154,10 +156,10 @@ class XODO:
         assert info_state_node is not None
         for action in info_state_node.legal_actions:
             if old_info_state_node and (action in old_info_state_node.cumulative_regret):
-                info_state_node.cumulative_regret[action] = old_info_state_node.cumulative_regret[action]
-            new_solver.warm_star_init(state.child(action), old_solver, new_solver)
+                info_state_node.cumulative_regret[action] = old_info_state_node.cumulative_regret[action] * self.warm_start_discount
+            self.warm_star_init(state.child(action), old_solver, new_solver)
 
-    def reset_meta_solver(self, restricted_game, warm_start=False, old_solver=None):        
+    def reset_meta_solver(self, restricted_game, old_solver=None):        
         if self.meta_solver == 'cfr_plus':
             meta_solver = cfr.CFRPlusSolver(restricted_game)
         elif self.meta_solver == 'cfr':
@@ -165,9 +167,9 @@ class XODO:
         else:
             raise ValueError("Algorithm unidentified")
         
-        if (not old_solver) or (not warm_start):
+        if (not old_solver) or (not self.is_warm_start):
             return meta_solver
-
+        print('warm start')
         self.warm_star_init(restricted_game.new_initial_state(), old_solver, meta_solver)
         return meta_solver
 
@@ -207,7 +209,8 @@ class XODO:
             else:
                 avg_policy = current_window_policy
             conv = exploitability.exploitability(game, avg_policy)
-            save_prefix = f'/root/data/results/{self.game_name}_{self.algorithm}_{str(self.meta_iterations)}_ws{self.is_warm_start}_{seed}'
+            save_prefix = f'/root/data/results/{self.game_name}_{self.algorithm}_{str(self.meta_iterations)}' + \
+                f'_ws{self.is_warm_start}_weak{self.is_weak_warm_start}_{self.warm_start_discount}_{seed}'
 
             if (new_br and i > 0) or i % self.data_collect_frequency == 0:
                 print("Iteration {} exploitability {}".format(i, conv))
@@ -228,7 +231,8 @@ class XODO:
 
             if new_br and i > 0:
                 restricted_game = MetaGame(game, br_list)
-                meta_solver = self.reset_meta_solver(restricted_game)
+                old_meta_solver = meta_solver
+                meta_solver = self.reset_meta_solver(restricted_game, old_solver=old_meta_solver)
                 if previous_avg_policy:
                     del previous_avg_policy
                 prev_iter = i
@@ -278,6 +282,8 @@ if __name__ == '__main__':
     parser.add_argument('--iterations', type=int, required=False, default=10000)
     parser.add_argument('--meta_solver', type=str, required=False, default="cfr_plus")
     parser.add_argument('-w', '--is_warm_start', action='store_true')  # on/off flag
+    parser.add_argument('-wws', '--is_weak_warm_start', action='store_true')  # on/off flag
+    parser.add_argument('--delta', type=str, required=False, default="0.1")  # warm start discount
     parser.add_argument('--seed', type=int, required=False, default=0) 
     parser.add_argument('--game_name', type=str, required=False, default="kuhn_poker",
                         choices=["leduc_poker", "kuhn_poker", "leduc_poker_dummy", "oshi_zumo", "liars_dice",
@@ -292,18 +298,21 @@ if __name__ == '__main__':
     meta_iterations = commandline_args.meta_iterations if algorithm != "XODO" else 1
     meta_solver = commandline_args.meta_solver
     is_warm_start = commandline_args.is_warm_start
+    delta = eval(commandline_args.delta)
+    is_weak_warm_start = commandline_args.is_weak_warm_start
 
     data_collect_frequency = 10
     np.random.seed(seed)
 
     print(vars(commandline_args))
-    # print(algorithm, game_name, meta_iterations, iterations, data_collect_frequency, seed, is_warm_start)
 
     xodo = XODO(algorithm=algorithm,
                 game_name=game_name,
                 meta_iterations=meta_iterations,
                 data_collect_frequency=data_collect_frequency,
                 meta_solver=meta_solver,
-                is_warm_start=is_warm_start)
+                is_warm_start=is_warm_start,
+                warm_start_discount=delta,
+                is_weak_warm_start=is_weak_warm_start)
     game = xodo.reset_game()
     xodo.run(game, iterations, seed)
