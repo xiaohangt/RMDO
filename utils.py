@@ -1,9 +1,12 @@
 import numpy as np
 import pdb
+from collections import defaultdict
 import os
 
 def get_support(policy, game):
-    supports = []
+    supports = defaultdict(list)
+    bars = [0, 0.0001, 0.001, 0.01, 0.1] 
+    results = []
     
     def traverse(state):
         if state.is_terminal():
@@ -15,14 +18,15 @@ def get_support(policy, game):
             return 
 
         legal_actions = state.legal_actions()
-        num_positive_probs = len(np.where(np.fromiter(policy.action_probabilities(state).values(), dtype=float) > 0)[0])
-        supports.append(num_positive_probs / len(legal_actions))
+        for bar in bars:
+            num_positive_probs = len(np.where(np.fromiter(policy.action_probabilities(state).values(), dtype=float) > bar)[0])
+            supports[bar].append(num_positive_probs / len(legal_actions))
 
         for action in legal_actions:
             traverse(state.child(action))
     
     traverse(game.new_initial_state())
-    return np.mean(supports), np.sum(supports)
+    return [(np.mean(supports[key]).round(2), np.sum(supports[key]).round(2)) for key in supports.keys()]
 
 
 def ensure_dir(file_path):

@@ -2,3 +2,7 @@
 dependencies/
 *.sh
 *.npy
+
+.ipynb_checkpoints/
+__pycache__/
+*.out

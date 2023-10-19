@@ -100,7 +100,7 @@ class ExpandTabularPolicy:
         return {a: 1 / len(state.legal_actions()) for a in state.legal_actions()}
 
 
-class XODO:
+class RMDO:
     def __init__(self, algorithm: str, game_name: str, meta_iterations: int, data_collect_frequency: int,
                  meta_solver: str, is_warm_start: bool, warm_start_discount=1, is_weak_warm_start=False):
         self.algorithm = algorithm
@@ -177,9 +177,9 @@ class XODO:
         brs = []
         k = 0
         br_actions = {}
-        xodo_times = []
-        xodo_exps = []
-        xodo_infostates = []
+        rmdo_times = []
+        rmdo_exps = []
+        rmdo_infostates = []
         num_infostates = 0
         start_time = time.time()
         previous_avg_policy, current_window_policy, prev_iter = None, None, None
@@ -215,15 +215,15 @@ class XODO:
             if (new_br and i > 0) or i % self.data_collect_frequency == 0:
                 print("Iteration {} exploitability {}".format(i, conv))
                 wall_time = time.time() - start_time
-                xodo_times.append(wall_time)
-                xodo_exps.append(conv)
-                xodo_infostates.append(num_infostates)
+                rmdo_times.append(wall_time)
+                rmdo_exps.append(conv)
+                rmdo_infostates.append(num_infostates)
                 ensure_dir(save_prefix)
                 if time.time() - start_time < 258000:
-                    np.save(save_prefix + '_times', np.array(xodo_times))
-                    np.save(save_prefix + '_exps', np.array(xodo_exps))
-                    np.save(save_prefix + '_infostates', np.array(xodo_infostates))
-                    np.save(save_prefix + '_infos', [k, xodo_exps[-1], get_support(avg_policy, game)]) # k, the lowest exp and support
+                    np.save(save_prefix + '_times', np.array(rmdo_times))
+                    np.save(save_prefix + '_exps', np.array(rmdo_exps))
+                    np.save(save_prefix + '_infostates', np.array(rmdo_infostates))
+                    np.save(save_prefix + '_infos', [k, rmdo_exps[-1], get_support(avg_policy, game)]) # k, the lowest exp and support
 
             # If there is new BR, construct meta-game, increase window count and reset strategy
             if new_br:
@@ -276,7 +276,7 @@ class XODO:
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--algorithm', type=str, choices=["XODO", "PDO"],
+    parser.add_argument('--algorithm', type=str, choices=["XODO", "PDO", "AdaDO"],
                         required=False, default="PDO")
     parser.add_argument('--meta_iterations', type=int, required=False, default=50)
     parser.add_argument('--iterations', type=int, required=False, default=10000)
@@ -295,7 +295,7 @@ if __name__ == '__main__':
     algorithm = commandline_args.algorithm
     game_name = commandline_args.game_name
     iterations = commandline_args.iterations
-    meta_iterations = commandline_args.meta_iterations if algorithm != "XODO" else 1
+    meta_iterations = commandline_args.meta_iterations if algorithm == "PDO" else 1
     meta_solver = commandline_args.meta_solver
     is_warm_start = commandline_args.is_warm_start
     delta = eval(commandline_args.delta)
@@ -306,7 +306,7 @@ if __name__ == '__main__':
 
     print(vars(commandline_args))
 
-    xodo = XODO(algorithm=algorithm,
+    rmdo = RMDO(algorithm=algorithm,
                 game_name=game_name,
                 meta_iterations=meta_iterations,
                 data_collect_frequency=data_collect_frequency,
@@ -314,5 +314,5 @@ if __name__ == '__main__':
                 is_warm_start=is_warm_start,
                 warm_start_discount=delta,
                 is_weak_warm_start=is_weak_warm_start)
-    game = xodo.reset_game()
-    xodo.run(game, iterations, seed)
+    game = rmdo.reset_game()
+    rmdo.run(game, iterations, seed)

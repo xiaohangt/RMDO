@@ -6,7 +6,8 @@ import os
 import argparse
 import datetime
 import time
-
+import pickle
+import pdb
 import numpy as np
 import pyspiel
 import blotto
@@ -125,7 +126,8 @@ if __name__ == '__main__':
                 solver.evaluate_and_update_policy()
             else:
                 solver.iteration()
-            if i % 5 == 0:
+            data_collect_freq = 5000 if "mccfr" in algorithm else 10
+            if i % data_collect_freq == 0:
                 print(algorithm)
                 if 'cfr' in algorithm:
                     average_policy = solver.average_policy()
@@ -139,21 +141,25 @@ if __name__ == '__main__':
                 conv = exploitability.exploitability(game, average_policy)
                 print("Iteration {} exploitability {}".format(i, conv))
                 elapsed_time = time.time() - start_time
-                print(elapsed_time)
+                print("Time:", elapsed_time)
                 times.append(elapsed_time)
                 exps.append(conv)
                 episodes.append(i)
                 save_prefix = '/root/data/results/' + algorithm + '_' + game_name + f"_{seed}_"
                 ensure_dir(save_prefix)
                 print(f"saving to: {save_prefix + '_times.npy'}")
+                # pdb.set_trace()
                 np.save(save_prefix + '_times', np.array(times))
                 print(f"saving to: {save_prefix + '_exps.npy'}")
                 np.save(save_prefix + '_exps', np.array(exps))
-                print(f"saving to: {save_prefix + '_episodes.npy'}")
-                np.save(save_prefix + '_episodes', np.array(episodes))
+                # print(f"saving to: {save_prefix + '_episodes.npy'}")
+                # np.save(save_prefix + '_episodes', np.array(episodes))
                 cfr_infostates.append(solver.num_infostates_expanded)
                 print("Num infostates expanded (mil): ", solver.num_infostates_expanded / 1e6)
-                print(f"saving to: {save_prefix + '_infostates.npy'}")
+                print(f"saving to: {save_prefix + '_infostates.pkl'}")
+                # pickle.dump(cfr_infostates, open(save_prefix + '_infostates.pkl',"wb"))
+                # test = pickle.load(open(save_prefix + '_infostates.pkl','rb'))
+                # print(test)
                 np.save(save_prefix + '_infostates', np.array(cfr_infostates))
 
                 support = get_support(average_policy, game)
@@ -252,7 +258,6 @@ if __name__ == '__main__':
                 np.save(save_prefix + '_times', np.array(xdo_times))
                 np.save(save_prefix + '_exps', np.array(xdo_exps))
                 np.save(save_prefix + '_infostates', np.array(xdo_infostates))
-
                 np.save(save_prefix + '_infos', [get_support(cfr_br_solver.average_policy(), game)])
     elif algorithm == 'psro':
         brs = []

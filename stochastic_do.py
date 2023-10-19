@@ -20,7 +20,7 @@ from dependencies.open_spiel.python.algorithms import best_response
 from dependencies.open_spiel.python.algorithms import exploitability
 from dependencies.open_spiel.python.algorithms import outcome_sampling_mccfr as outcome_mccfr
 
-from approximate_best_response import MCBR, BestResponseWrapper
+from approximate_best_response import MCBR, mc_exploitability
 
 module_path = os.path.abspath(os.path.join(''))
 if module_path not in sys.path:
@@ -62,10 +62,10 @@ class MetaState:
             legal_actions = set()
             for br in self.brs[self.state.current_player()]:
                 try:
-                    # br.update_legal_actions(self.state)
+                    br.update_legal_actions(self.state)
                     legal_actions.add(br.best_response_action(self.state.information_state_string()))
                 except:
-                    pdb.set_trace()
+                    legal_actions.add(br.best_response_action(self.state.information_state_string()))
 
             ans = list(legal_actions)
             self.game._legal_actions_cache[self.state.history_str()] = ans
@@ -158,7 +158,7 @@ def display_policy(current_policy):
 
 
 class SPDO:
-    def __init__(self, algorithm: str, game_name: str, meta_iterations: int, data_collect_frequency: int, is_warm_start: bool):
+    def __init__(self, algorithm: str, game_name: str, meta_iterations: int, data_collect_frequency: int, is_warm_start: bool, is_mcbr=False):
         self.algorithm = algorithm
         self.game_name = game_name
         self.meta_iterations = meta_iterations
@@ -166,6 +166,7 @@ class SPDO:
         self.is_warm_start = is_warm_start
         self.br_actions = {}
         self.state_str_to_legal_actions = {}
+        self.is_mcbr = is_mcbr
 
     def reset_game(self):
         # Set up game environment
@@ -222,12 +223,12 @@ class SPDO:
         self.warm_star_init(old_solver, meta_solver, br_list)
         return meta_solver
     
-    def get_best_response(self, game, policy, exact_br=True):
+    def get_best_response(self, game, policy):
         brs = []
         new_br = False
         num_infostates_expanded = 0
         for pid in range(2):
-            if exact_br:
+            if not self.is_mcbr:
                 br = best_response.BestResponsePolicy(game, pid, policy)
                 br.expanded_infostates = 0
                 _ = br.value(game.new_initial_state())
@@ -278,10 +279,10 @@ class SPDO:
         current_window_policy = ExpandTabularPolicy(meta_solver.average_policy())
 
         for i in range(iterations):
-            # display_policy(meta_solver.average_policy())
             avg_policy = current_window_policy
 
             conv = exploitability.exploitability(game, avg_policy)
+            # conv = mc_exploitability(game, avg_policy)
             save_prefix = f'/root/data/results/{self.game_name}_{self.algorithm}_{self.meta_iterations}_ws{self.is_warm_start}_{seed}'
 
             if (new_br and i > 0) or i % self.data_collect_frequency == 0:
@@ -305,10 +306,7 @@ class SPDO:
                 meta_solver = self.reset_meta_solver(restricted_game, br_list, old_meta_solver)
                 if previous_avg_policy:
                     del previous_avg_policy
-                prev_iter = i
                 previous_avg_policy = avg_policy
-                # policies.append(current_window_policy)
-                # windows.append(i)
 
             # Run meta-strategy updates
             meta_solver.num_infostates_expanded = 0
@@ -335,6 +333,7 @@ if __name__ == '__main__':
     parser.add_argument('--algorithm', type=str, choices=["SPDO"],
                         required=False, default="SPDO")
     parser.add_argument('--meta_iterations', type=int, required=False, default=500)
+    parser.add_argument('--is_mcbr', action='store_true')  # on/off flag
     parser.add_argument('--seed', type=int, required=False, default=0)
     parser.add_argument('-w', '--is_warm_start', action='store_true')  # on/off flag
     parser.add_argument('--game_name', type=str, required=False, default="kuhn_poker",
@@ -347,14 +346,15 @@ if __name__ == '__main__':
     algorithm = commandline_args.algorithm
     game_name = commandline_args.game_name
     meta_iterations = commandline_args.meta_iterations
-    iterations = 10000
-    data_collect_frequency = 10
+    iterations = 100000
+    data_collect_frequency = 1000
     is_warm_start = commandline_args.is_warm_start
+    is_mcbr = commandline_args.is_mcbr
 
     print(vars(commandline_args))
 
     np.random.seed(seed)
-    algo = SPDO(algorithm, game_name, meta_iterations, data_collect_frequency, is_warm_start)
+    algo = SPDO(algorithm, game_name, meta_iterations, data_collect_frequency, is_warm_start, is_mcbr)
     game = algo.reset_game()
     algo.run(game, iterations, seed)
 

@@ -59,9 +59,11 @@ class MCBR(outcome_mccfr.OutcomeSamplingSolver):
 
     def value(self, num_values):
         self.expanded_infostates = 0
+        value_estimated = 0
         for _ in range(num_values):
             state = self._game.new_initial_state()
-            self._episode_br(state, self.br_id, opp_reach=1.0, sample_reach=1.0)
+            value_estimated += self._episode_br(state, self.br_id, opp_reach=1.0, sample_reach=1.0)
+        return value_estimated / num_values
 
     def _episode_br(self, state, br_id, opp_reach, sample_reach):
         """Runs an episode of outcome sampling.
@@ -141,6 +143,14 @@ class MCBR(outcome_mccfr.OutcomeSamplingSolver):
             self.best_response_action(info_state_key)
 
         return value_estimate
+
+
+def mc_exploitability(game, policy):
+    # pdb.set_trace()
+    nash_conv_value = (
+      sum(MCBR(game, best_responder, policy).value(1000)
+          for best_responder in range(game.num_players())) - game.utility_sum())
+    return nash_conv_value / game.num_players()
 
 
 
