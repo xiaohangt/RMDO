@@ -239,10 +239,18 @@ class RMDO:
                 previous_avg_policy = avg_policy
 
             # Run meta-strategy updates
-            meta_solver.num_infostates_expanded = 0
-            for _ in range(self.meta_iterations):
+            if self.algorithm == "AdaDO":
+                meta_solver.num_infostates_expanded = 0
                 meta_solver.evaluate_and_update_policy()
-            num_infostates += meta_solver.num_infostates_expanded
+                frequency = meta_solver.num_infostates_expanded - 1
+                for _ in range(frequency):
+                    meta_solver.evaluate_and_update_policy()
+                num_infostates += meta_solver.num_infostates_expanded
+            else:
+                meta_solver.num_infostates_expanded = 0
+                for _ in range(self.meta_iterations):
+                    meta_solver.evaluate_and_update_policy()
+                num_infostates += meta_solver.num_infostates_expanded
 
             # Compute BR
             new_brs = []
