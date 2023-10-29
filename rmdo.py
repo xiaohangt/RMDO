@@ -7,8 +7,10 @@ import argparse
 import numpy as np
 from copy import deepcopy
 import blotto
+import pdb
 import large_kuhn_poker
 from utils import get_support, ensure_dir, merge_two_policies   
+from open_spiel.python.algorithms import get_all_states
 
 from dependencies.open_spiel.python import policy
 from dependencies.open_spiel.python.algorithms import cfr
@@ -172,14 +174,42 @@ class RMDO:
         print('warm start')
         self.warm_star_init(restricted_game.new_initial_state(), old_solver, meta_solver)
         return meta_solver
+    
+
+    def test_and_save(self, game, seed, start_time, num_infostates, k, meta_solver,
+                        previous_avg_policy, current_window_policy, i, prev_iter=None):
+        current_window_policy = ExpandTabularPolicy(meta_solver.average_policy())
+
+        if (self.algorithm == "XODO") and previous_avg_policy:
+            avg_policy = merge_two_policies(previous_avg_policy, current_window_policy, i, prev_iter)
+        else:
+            avg_policy = current_window_policy
+
+        conv = exploitability.exploitability(game, avg_policy)
+        save_prefix = f'/root/data/results/{self.game_name}_{self.algorithm}_{str(self.meta_iterations)}' + \
+            f'_ws{self.is_warm_start}_weak{self.is_weak_warm_start}_{self.warm_start_discount}_{seed}'
+        print("Iteration {} exploitability {}".format(i, conv))
+        wall_time = time.time() - start_time
+        self.rmdo_times.append(wall_time)
+        self.rmdo_exps.append(conv)
+        self.rmdo_infostates.append(num_infostates)
+        ensure_dir(save_prefix)
+        if time.time() - start_time < 64500:
+            np.save(save_prefix + '_times', np.array(self.rmdo_times))
+            np.save(save_prefix + '_exps', np.array(self.rmdo_exps))
+            np.save(save_prefix + '_infostates', np.array(self.rmdo_infostates))
+            np.save(save_prefix + '_infos', np.array([k, self.rmdo_exps[-1]] + get_support(avg_policy, game))) # k, the lowest exp and support
+        return avg_policy
+
+
 
     def run(self, game, iterations, seed):
         brs = []
         k = 0
         br_actions = {}
-        rmdo_times = []
-        rmdo_exps = []
-        rmdo_infostates = []
+        self.rmdo_times = []
+        self.rmdo_exps = []
+        self.rmdo_infostates = []
         num_infostates = 0
         start_time = time.time()
         previous_avg_policy, current_window_policy, prev_iter = None, None, None
@@ -201,56 +231,39 @@ class RMDO:
         # Construct meta game
         restricted_game = MetaGame(game, br_list)
         meta_solver = self.reset_meta_solver(restricted_game)
-        current_window_policy = ExpandTabularPolicy(meta_solver.average_policy())
 
         for i in range(iterations):
-            if (self.algorithm == "XODO") and previous_avg_policy:
-                avg_policy = merge_two_policies(previous_avg_policy, current_window_policy, i, prev_iter)
-            else:
-                avg_policy = current_window_policy
-            conv = exploitability.exploitability(game, avg_policy)
-            save_prefix = f'/root/data/results/{self.game_name}_{self.algorithm}_{str(self.meta_iterations)}' + \
-                f'_ws{self.is_warm_start}_weak{self.is_weak_warm_start}_{self.warm_start_discount}_{seed}'
 
             if (new_br and i > 0) or i % self.data_collect_frequency == 0:
-                print("Iteration {} exploitability {}".format(i, conv))
-                wall_time = time.time() - start_time
-                rmdo_times.append(wall_time)
-                rmdo_exps.append(conv)
-                rmdo_infostates.append(num_infostates)
-                ensure_dir(save_prefix)
-                if time.time() - start_time < 258000:
-                    np.save(save_prefix + '_times', np.array(rmdo_times))
-                    np.save(save_prefix + '_exps', np.array(rmdo_exps))
-                    np.save(save_prefix + '_infostates', np.array(rmdo_infostates))
-                    np.save(save_prefix + '_infos', [k, rmdo_exps[-1], get_support(avg_policy, game)]) # k, the lowest exp and support
+                avg_policy = self.test_and_save(game, seed, start_time, num_infostates, k, meta_solver, \
+                    previous_avg_policy, current_window_policy, i, prev_iter)
 
-            # If there is new BR, construct meta-game, increase window count and reset strategy
             if new_br:
                 k += 1
-
-            if new_br and i > 0:
-                restricted_game = MetaGame(game, br_list)
-                old_meta_solver = meta_solver
-                meta_solver = self.reset_meta_solver(restricted_game, old_solver=old_meta_solver)
-                if previous_avg_policy:
-                    del previous_avg_policy
-                prev_iter = i
-                previous_avg_policy = avg_policy
+                if i > 0:
+                    restricted_game = MetaGame(game, br_list)
+                    meta_solver = self.reset_meta_solver(restricted_game, old_solver=meta_solver)
+                    if previous_avg_policy:
+                        del previous_avg_policy
+                    prev_iter = i
+                    previous_avg_policy = avg_policy
 
             # Run meta-strategy updates
             if self.algorithm == "AdaDO":
                 meta_solver.num_infostates_expanded = 0
                 meta_solver.evaluate_and_update_policy()
-                frequency = meta_solver.num_infostates_expanded - 1
-                for _ in range(frequency):
-                    meta_solver.evaluate_and_update_policy()
                 num_infostates += meta_solver.num_infostates_expanded
+                frequency = np.rint(np.sqrt(meta_solver.max_act) * len(meta_solver.all_info_states)) - 1
             else:
+                frequency = self.meta_iterations
+            print(frequency, self.data_collect_frequency * 10)
+            for meta_i in range(int(frequency)):
                 meta_solver.num_infostates_expanded = 0
-                for _ in range(self.meta_iterations):
-                    meta_solver.evaluate_and_update_policy()
+                meta_solver.evaluate_and_update_policy()
                 num_infostates += meta_solver.num_infostates_expanded
+                if meta_i % self.data_collect_frequency * 10 == 0:
+                    self.test_and_save(game, seed, start_time, num_infostates, k, meta_solver, \
+                        previous_avg_policy, current_window_policy, i, prev_iter)
 
             # Compute BR
             new_brs = []
@@ -287,7 +300,7 @@ if __name__ == '__main__':
     parser.add_argument('--algorithm', type=str, choices=["XODO", "PDO", "AdaDO"],
                         required=False, default="PDO")
     parser.add_argument('--meta_iterations', type=int, required=False, default=50)
-    parser.add_argument('--iterations', type=int, required=False, default=10000)
+    parser.add_argument('--iterations', type=int, required=False, default=100000)
     parser.add_argument('--meta_solver', type=str, required=False, default="cfr_plus")
     parser.add_argument('-w', '--is_warm_start', action='store_true')  # on/off flag
     parser.add_argument('-wws', '--is_weak_warm_start', action='store_true')  # on/off flag

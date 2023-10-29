@@ -6,3 +6,4 @@ dependencies/
 .ipynb_checkpoints/
 __pycache__/
 *.out
+results/

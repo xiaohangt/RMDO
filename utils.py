@@ -6,7 +6,6 @@ import os
 def get_support(policy, game):
     supports = defaultdict(list)
     bars = [0, 0.0001, 0.001, 0.01, 0.1] 
-    results = []
     
     def traverse(state):
         if state.is_terminal():
@@ -26,7 +25,8 @@ def get_support(policy, game):
             traverse(state.child(action))
     
     traverse(game.new_initial_state())
-    return [(np.mean(supports[key]).round(2), np.sum(supports[key]).round(2)) for key in supports.keys()]
+    return [np.mean(supports[key]).round(2) for key in supports.keys()] + \
+        [np.sum(supports[key]).round(2) for key in supports.keys()]
 
 
 def ensure_dir(file_path):

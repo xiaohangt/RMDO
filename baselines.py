@@ -109,7 +109,7 @@ if __name__ == '__main__':
         game = pyspiel.load_game(game_name, {"players": pyspiel.GameParameter(2)})
 
     starting_br_conv_threshold = 2 ** 4
-    iterations = 1000000
+    iterations = 100000000 if algorithm == "outcome_sampling_mccfr" else 1000000
     xdo_iterations = 200000
     random_max_br = False
 
