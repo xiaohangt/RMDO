@@ -104,7 +104,7 @@ class ExpandTabularPolicy:
 
 class RMDO:
     def __init__(self, algorithm: str, game_name: str, meta_iterations: int, data_collect_frequency: int,
-                 meta_solver: str, is_warm_start: bool, warm_start_discount=1, is_weak_warm_start=False):
+                 meta_solver: str, is_warm_start: bool, warm_start_discount=1, is_avg_warm_start=False, is_testing=False):
         self.algorithm = algorithm
         self.game_name = game_name
         self.meta_solver = meta_solver
@@ -112,7 +112,8 @@ class RMDO:
         self.data_collect_frequency = data_collect_frequency
         self.is_warm_start = is_warm_start
         self.warm_start_discount = warm_start_discount
-        self.is_weak_warm_start = is_weak_warm_start
+        self.is_avg_warm_start = is_avg_warm_start
+        self.is_testing = is_testing
 
     def reset_game(self):
         # Set up game environment
@@ -172,6 +173,8 @@ class RMDO:
         if (not old_solver) or (not self.is_warm_start):
             return meta_solver
         print('warm start')
+        if self.is_avg_warm_start:
+            old_solver.get_avgpolicy_regret()
         self.warm_star_init(restricted_game.new_initial_state(), old_solver, meta_solver)
         return meta_solver
     
@@ -187,14 +190,14 @@ class RMDO:
 
         conv = exploitability.exploitability(game, avg_policy)
         save_prefix = f'/root/data/results/{self.game_name}_{self.algorithm}_{str(self.meta_iterations)}' + \
-            f'_ws{self.is_warm_start}_weak{self.is_weak_warm_start}_{self.warm_start_discount}_{seed}'
+            f'_ws{self.is_warm_start}_avg{self.is_avg_warm_start}_{self.warm_start_discount}_{seed}'
         print("Iteration {} exploitability {}".format(i, conv))
         wall_time = time.time() - start_time
         self.rmdo_times.append(wall_time)
         self.rmdo_exps.append(conv)
         self.rmdo_infostates.append(num_infostates)
         ensure_dir(save_prefix)
-        if time.time() - start_time < 64500:
+        if (time.time() - start_time < 64500) and (not self.is_testing):
             np.save(save_prefix + '_times', np.array(self.rmdo_times))
             np.save(save_prefix + '_exps', np.array(self.rmdo_exps))
             np.save(save_prefix + '_infostates', np.array(self.rmdo_infostates))
@@ -256,7 +259,6 @@ class RMDO:
                 frequency = np.rint(np.sqrt(meta_solver.max_act) * len(meta_solver.all_info_states)) - 1
             else:
                 frequency = self.meta_iterations
-            print(frequency, self.data_collect_frequency * 10)
             for meta_i in range(int(frequency)):
                 meta_solver.num_infostates_expanded = 0
                 meta_solver.evaluate_and_update_policy()
@@ -302,8 +304,9 @@ if __name__ == '__main__':
     parser.add_argument('--meta_iterations', type=int, required=False, default=50)
     parser.add_argument('--iterations', type=int, required=False, default=100000)
     parser.add_argument('--meta_solver', type=str, required=False, default="cfr_plus")
+    parser.add_argument('-t', '--test', action='store_true')  # on/off flag
     parser.add_argument('-w', '--is_warm_start', action='store_true')  # on/off flag
-    parser.add_argument('-wws', '--is_weak_warm_start', action='store_true')  # on/off flag
+    parser.add_argument('-aws', '--is_avg_warm_start', action='store_true')  # on/off flag
     parser.add_argument('--delta', type=str, required=False, default="0.1")  # warm start discount
     parser.add_argument('--seed', type=int, required=False, default=0) 
     parser.add_argument('--game_name', type=str, required=False, default="kuhn_poker",
@@ -320,7 +323,8 @@ if __name__ == '__main__':
     meta_solver = commandline_args.meta_solver
     is_warm_start = commandline_args.is_warm_start
     delta = eval(commandline_args.delta)
-    is_weak_warm_start = commandline_args.is_weak_warm_start
+    is_avg_warm_start = commandline_args.is_avg_warm_start
+    is_testing = commandline_args.test
 
     data_collect_frequency = 10
     np.random.seed(seed)
@@ -334,6 +338,7 @@ if __name__ == '__main__':
                 meta_solver=meta_solver,
                 is_warm_start=is_warm_start,
                 warm_start_discount=delta,
-                is_weak_warm_start=is_weak_warm_start)
+                is_avg_warm_start=is_avg_warm_start,
+                is_testing=is_testing)
     game = rmdo.reset_game()
     rmdo.run(game, iterations, seed)
