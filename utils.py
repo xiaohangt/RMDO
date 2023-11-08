@@ -26,7 +26,7 @@ def get_support(policy, game):
     
     traverse(game.new_initial_state())
     return [np.mean(supports[key]).round(2) for key in supports.keys()] + \
-        [np.sum(supports[key]).round(2) for key in supports.keys()]
+        [np.min(supports[key]).round(2) for key in supports.keys()]
 
 
 def ensure_dir(file_path):

@@ -158,7 +158,7 @@ def display_policy(current_policy):
 
 
 class SPDO:
-    def __init__(self, algorithm: str, game_name: str, meta_iterations: int, data_collect_frequency: int, is_warm_start: bool, is_mcbr=False):
+    def __init__(self, algorithm: str, game_name: str, meta_iterations: int, data_collect_frequency: int, is_warm_start: bool, is_mcbr=False, out_dir="results"):
         self.algorithm = algorithm
         self.game_name = game_name
         self.meta_iterations = meta_iterations
@@ -167,6 +167,7 @@ class SPDO:
         self.br_actions = {}
         self.state_str_to_legal_actions = {}
         self.is_mcbr = is_mcbr
+        self.out_dir = out_dir
 
     def reset_game(self):
         # Set up game environment
@@ -283,7 +284,7 @@ class SPDO:
 
             conv = exploitability.exploitability(game, avg_policy)
             # conv = mc_exploitability(game, avg_policy)
-            save_prefix = f'/root/data/results/{self.game_name}_{self.algorithm}_{self.meta_iterations}_ws{self.is_warm_start}_{seed}'
+            save_prefix = f'{self.out_dir}/{self.game_name}_{self.algorithm}_{self.meta_iterations}_ws{self.is_warm_start}_{seed}'
 
             if (new_br and i > 0) or i % self.data_collect_frequency == 0:
                 # print(avg_policy.action_probability_array)
@@ -334,6 +335,7 @@ if __name__ == '__main__':
                         required=False, default="SPDO")
     parser.add_argument('--meta_iterations', type=int, required=False, default=500)
     parser.add_argument('--is_mcbr', action='store_true')  # on/off flag
+    parser.add_argument('--out_dir', type=str, required=False, default="results")  # output folder
     parser.add_argument('--seed', type=int, required=False, default=0)
     parser.add_argument('-w', '--is_warm_start', action='store_true')  # on/off flag
     parser.add_argument('--game_name', type=str, required=False, default="kuhn_poker",
@@ -350,11 +352,12 @@ if __name__ == '__main__':
     data_collect_frequency = 1000
     is_warm_start = commandline_args.is_warm_start
     is_mcbr = commandline_args.is_mcbr
+    out_dir = commandline_args.out_dir
 
     print(vars(commandline_args))
 
     np.random.seed(seed)
-    algo = SPDO(algorithm, game_name, meta_iterations, data_collect_frequency, is_warm_start, is_mcbr)
+    algo = SPDO(algorithm, game_name, meta_iterations, data_collect_frequency, is_warm_start, is_mcbr, out_dir)
     game = algo.reset_game()
     algo.run(game, iterations, seed)
 

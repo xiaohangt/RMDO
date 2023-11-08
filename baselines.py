@@ -75,13 +75,15 @@ if __name__ == '__main__':
                                  "goofspiel", "havannah", "blotto", "python_large_kuhn_poker"])
     parser.add_argument('--display', type=bool, default=False)
     parser.add_argument('--seed', type=int, required=False, default=0)
-
+    parser.add_argument('--out_dir', type=str, required=False, default="results")  # output folder
     commandline_args = parser.parse_args()
 
     seed = commandline_args.seed
     algorithm = commandline_args.algorithm
     game_name = commandline_args.game_name
     display = commandline_args.display
+    out_dir = commandline_args.out_dir
+
     extra_info = datetime.datetime.now().strftime("%I.%M.%S%p_%b-%d-%Y")
     np.random.seed(commandline_args.seed)
 
@@ -109,9 +111,10 @@ if __name__ == '__main__':
         game = pyspiel.load_game(game_name, {"players": pyspiel.GameParameter(2)})
 
     starting_br_conv_threshold = 2 ** 4
-    iterations = 100000000 if algorithm == "outcome_sampling_mccfr" else 1000000000
+    iterations = 10000000000 if algorithm == "outcome_sampling_mccfr" else 1000000000
     xdo_iterations = 200000
     random_max_br = False
+    supports = []
 
 
     def run(solver, iterations):
@@ -128,7 +131,6 @@ if __name__ == '__main__':
                 solver.iteration()
             data_collect_freq = 5000 if "mccfr" in algorithm else 10
             if i % data_collect_freq == 0:
-                print(algorithm)
                 if 'cfr' in algorithm:
                     average_policy = solver.average_policy()
                 elif algorithm == 'xfp':
@@ -145,27 +147,27 @@ if __name__ == '__main__':
                 times.append(elapsed_time)
                 exps.append(conv)
                 episodes.append(i)
-                save_prefix = '/root/data/results/' + algorithm + '_' + game_name + f"_{seed}_"
+                supports.append(get_support(average_policy, game))
+
+                save_prefix = f'{out_dir}/' + algorithm + '_' + game_name + f"_{seed}_"
                 ensure_dir(save_prefix)
                 print(f"saving to: {save_prefix + '_times.npy'}")
                 # pdb.set_trace()
                 np.save(save_prefix + '_times', np.array(times))
                 print(f"saving to: {save_prefix + '_exps.npy'}")
                 np.save(save_prefix + '_exps', np.array(exps))
-                # print(f"saving to: {save_prefix + '_episodes.npy'}")
-                # np.save(save_prefix + '_episodes', np.array(episodes))
+                print(f"saving to: {save_prefix + '_episodes.npy'}")
+                np.save(save_prefix + '_episodes', np.array(episodes))
                 cfr_infostates.append(solver.num_infostates_expanded)
                 print("Num infostates expanded (mil): ", solver.num_infostates_expanded / 1e6)
-                print(f"saving to: {save_prefix + '_infostates.pkl'}")
+                print(f"saving to: {save_prefix + '_infostates.npy'}")
                 # pickle.dump(cfr_infostates, open(save_prefix + '_infostates.pkl',"wb"))
                 # test = pickle.load(open(save_prefix + '_infostates.pkl','rb'))
                 # print(test)
                 np.save(save_prefix + '_infostates', np.array(cfr_infostates))
 
-                support = get_support(average_policy, game)
-                print("Support:", support)
                 print(f"saving to: {save_prefix + '_infos.npy'}")
-                np.save(save_prefix + '_infos', [support])
+                np.save(save_prefix + '_infos', np.array(supports))
 
     if algorithm == 'cfr':
         solver = cfr.CFRSolver(game)
@@ -218,6 +220,7 @@ if __name__ == '__main__':
                 if j % 50 == 0:
                     br_list_conv = exploitability_br_actions.exploitability(game, br_list,
                                                                             cfr_br_solver.average_policy())
+                    num_infostates += cfr_br_solver.num_infostates_expanded / j # add the complexity of computing exps in restricted games
                     if display:
                         print("Br list conv: ", br_list_conv, j)
                     if br_list_conv < br_conv_threshold:
@@ -240,6 +243,7 @@ if __name__ == '__main__':
             xdo_exps.append(conv)
             xdo_episodes.append(episode)
             xdo_infostates.append(num_infostates)
+            supports.append(get_support(cfr_br_solver.average_policy(), game))
 
             brs = []
             for i in range(2):
@@ -252,13 +256,13 @@ if __name__ == '__main__':
                 num_infostates += br_info["expanded_infostates"]
 
             br_list.append(brs)
-            save_prefix = '/root/data/results/' + algorithm + '_' + game_name + f"_{seed}_"
+            save_prefix = f'{out_dir}/' + algorithm + '_' + game_name + f"_{seed}_"
             ensure_dir(save_prefix)
             if time.time() - start_time < 258000:
                 np.save(save_prefix + '_times', np.array(xdo_times))
                 np.save(save_prefix + '_exps', np.array(xdo_exps))
                 np.save(save_prefix + '_infostates', np.array(xdo_infostates))
-                np.save(save_prefix + '_infos', [get_support(cfr_br_solver.average_policy(), game)])
+                np.save(save_prefix + '_infos', np.array(supports))
     elif algorithm == 'psro':
         brs = []
         info_test = []

@@ -104,7 +104,8 @@ class ExpandTabularPolicy:
 
 class RMDO:
     def __init__(self, algorithm: str, game_name: str, meta_iterations: int, data_collect_frequency: int,
-                 meta_solver: str, is_warm_start: bool, warm_start_discount=1, is_avg_warm_start=False, is_testing=False):
+                 meta_solver: str, is_warm_start: bool, warm_start_discount=1, is_avg_warm_start=False, is_testing=False,
+                 out_dir="results"):
         self.algorithm = algorithm
         self.game_name = game_name
         self.meta_solver = meta_solver
@@ -114,6 +115,7 @@ class RMDO:
         self.warm_start_discount = warm_start_discount
         self.is_avg_warm_start = is_avg_warm_start
         self.is_testing = is_testing
+        self.out_dir = out_dir
 
     def reset_game(self):
         # Set up game environment
@@ -189,19 +191,20 @@ class RMDO:
             avg_policy = current_window_policy
 
         conv = exploitability.exploitability(game, avg_policy)
-        save_prefix = f'/root/data/results/{self.game_name}_{self.algorithm}_{str(self.meta_iterations)}' + \
+        save_prefix = f'{self.out_dir}/{self.game_name}_{self.algorithm}_{str(self.meta_iterations)}' + \
             f'_ws{self.is_warm_start}_avg{self.is_avg_warm_start}_{self.warm_start_discount}_{seed}'
         print("Iteration {} exploitability {}".format(i, conv))
         wall_time = time.time() - start_time
         self.rmdo_times.append(wall_time)
         self.rmdo_exps.append(conv)
         self.rmdo_infostates.append(num_infostates)
+        self.supports.append([k] + get_support(avg_policy, game))
         ensure_dir(save_prefix)
-        if (time.time() - start_time < 64500) and (not self.is_testing):
-            np.save(save_prefix + '_times', np.array(self.rmdo_times))
-            np.save(save_prefix + '_exps', np.array(self.rmdo_exps))
-            np.save(save_prefix + '_infostates', np.array(self.rmdo_infostates))
-            np.save(save_prefix + '_infos', np.array([k, self.rmdo_exps[-1]] + get_support(avg_policy, game))) # k, the lowest exp and support
+        # if (time.time() - start_time < 64500) and (not self.is_testing):
+        np.save(save_prefix + '_times', np.array(self.rmdo_times))
+        np.save(save_prefix + '_exps', np.array(self.rmdo_exps))
+        np.save(save_prefix + '_infostates', np.array(self.rmdo_infostates))
+        np.save(save_prefix + '_infos', np.array(self.supports)) # k, the lowest exp and support
         return avg_policy
 
 
@@ -213,6 +216,7 @@ class RMDO:
         self.rmdo_times = []
         self.rmdo_exps = []
         self.rmdo_infostates = []
+        self.supports = []
         num_infostates = 0
         start_time = time.time()
         previous_avg_policy, current_window_policy, prev_iter = None, None, None
@@ -256,7 +260,7 @@ class RMDO:
                 meta_solver.num_infostates_expanded = 0
                 meta_solver.evaluate_and_update_policy()
                 num_infostates += meta_solver.num_infostates_expanded
-                frequency = np.rint(np.sqrt(meta_solver.max_act) * len(meta_solver.all_info_states)) - 1
+                frequency = np.rint(np.sqrt(meta_solver.max_act) * len(meta_solver.all_info_states)) * 0.1 - 1
             else:
                 frequency = self.meta_iterations
             for meta_i in range(int(frequency)):
@@ -308,6 +312,7 @@ if __name__ == '__main__':
     parser.add_argument('-w', '--is_warm_start', action='store_true')  # on/off flag
     parser.add_argument('-aws', '--is_avg_warm_start', action='store_true')  # on/off flag
     parser.add_argument('--delta', type=str, required=False, default="0.1")  # warm start discount
+    parser.add_argument('--out_dir', type=str, required=False, default="results")  # output folder
     parser.add_argument('--seed', type=int, required=False, default=0) 
     parser.add_argument('--game_name', type=str, required=False, default="kuhn_poker",
                         choices=["leduc_poker", "kuhn_poker", "leduc_poker_dummy", "oshi_zumo", "liars_dice",
@@ -325,6 +330,7 @@ if __name__ == '__main__':
     delta = eval(commandline_args.delta)
     is_avg_warm_start = commandline_args.is_avg_warm_start
     is_testing = commandline_args.test
+    out_dir = commandline_args.out_dir
 
     data_collect_frequency = 10
     np.random.seed(seed)
@@ -339,6 +345,7 @@ if __name__ == '__main__':
                 is_warm_start=is_warm_start,
                 warm_start_discount=delta,
                 is_avg_warm_start=is_avg_warm_start,
-                is_testing=is_testing)
+                is_testing=is_testing,
+                out_dir=out_dir)
     game = rmdo.reset_game()
     rmdo.run(game, iterations, seed)
