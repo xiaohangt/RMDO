@@ -363,8 +363,10 @@ def run_plot_sto_methods():
         ax.set_xlabel('Number of nodes visited')
         if env_name == "python_large_kuhn_poker":
             ax.legend(loc='upper center', bbox_to_anchor=(0.5, 1.3), fancybox=True, shadow=True, ncol=7, fontsize=SMALL_SIZE*1.6)
-        if env_name == "kuhn_poker":
+        elif env_name == "kuhn_poker":
             ax.set_ylabel('Exploitability')
+        else:
+            ax.set_ylim([1e-2, 10])
         # plt.legend(loc='lower right') #, bbox_to_anchor=(1.5, 1.5), fancybox=True, shadow=True, ncol=5)
         ax.grid(True)
     fig.savefig(f"results_figs/stochastic_new.pdf", bbox_inches='tight', dpi=200, transparent=True)
