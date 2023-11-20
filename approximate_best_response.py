@@ -43,10 +43,15 @@ class MCBR(outcome_mccfr.OutcomeSamplingSolver):
         self.policy = policy
         self.expanded_infostates = 0   
         self.state_str_to_legal_actions = {} 
+        self._expl = 0.3
 
     @_memoize_method
     def best_response_action(self, info_state_key):
-        legal_actions = self.state_str_to_legal_actions[info_state_key]
+        try:
+            legal_actions = self.state_str_to_legal_actions[info_state_key]
+        except:
+            print(self.state_str_to_legal_actions)
+
         if info_state_key not in self._infostates:
             return legal_actions[0]
         action_id = np.argmax(self._infostates[info_state_key][0])

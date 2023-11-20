@@ -12,6 +12,7 @@ import blotto
 import pdb
 
 import large_kuhn_poker
+from dependencies.open_spiel.python.algorithms import get_all_states
 from dependencies.open_spiel.python.games import tic_tac_toe
 from dependencies.open_spiel.python.games import kuhn_poker
 from dependencies.open_spiel.python import policy
@@ -168,7 +169,7 @@ class SPDO:
         self.state_str_to_legal_actions = {}
         self.is_mcbr = is_mcbr
         self.out_dir = out_dir
-
+        self.game_size = 0
     def reset_game(self):
         # Set up game environment
         if self.game_name == "oshi_zumo":
@@ -193,6 +194,8 @@ class SPDO:
             game = large_kuhn_poker.KuhnPokerGame()
         else:
             game = pyspiel.load_game(self.game_name)
+        
+        self.game_size = len(get_all_states.get_all_states(game, include_chance_states=True))
         return game
 
     def warm_star_init(self, old_solver, new_solver, br_list):
@@ -238,7 +241,7 @@ class SPDO:
                     br.best_response_action(infostate)
             else:
                 br = MCBR(game, pid, policy)
-                br.value(100)
+                br.value(self.game_size)
 
             for key, action in br.cache_best_response_action.items():
                 if key in self.br_actions:
@@ -284,7 +287,8 @@ class SPDO:
 
             conv = exploitability.exploitability(game, avg_policy)
             # conv = mc_exploitability(game, avg_policy)
-            save_prefix = f'{self.out_dir}/{self.game_name}_{self.algorithm}_{self.meta_iterations}_ws{self.is_warm_start}_{seed}'
+            mcbr_str = "_mcbr" if self.is_mcbr else ""
+            save_prefix = f'{self.out_dir}/{self.game_name}_{self.algorithm}_{self.meta_iterations}_ws{self.is_warm_start}{mcbr_str}_{seed}'
 
             if (new_br and i > 0) or i % self.data_collect_frequency == 0:
                 # print(avg_policy.action_probability_array)
@@ -310,8 +314,18 @@ class SPDO:
                 previous_avg_policy = avg_policy
 
             # Run meta-strategy updates
+            if self.algorithm == "SADO":
+                all_states, depth_h, max_a = get_all_states.get_all_statistics(restricted_game, include_chance_states=False)
+                s_j = len(all_states)
+                if is_mcbr:
+                    frequency = np.rint(np.sqrt(s_j^3 * max_a)) * 0.1
+                else:
+                    frequency = np.rint(s_j * np.sqrt(max_a) / depth_h) * 0.1
+            else:
+                frequency = self.meta_iterations
+
             meta_solver.num_infostates_expanded = 0
-            for _ in range(self.meta_iterations):
+            for _ in range(int(frequency)):
                 meta_solver.evaluate_and_update_policy()
             num_infostates += meta_solver.num_infostates_expanded
 
@@ -331,7 +345,7 @@ class SPDO:
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--algorithm', type=str, choices=["SPDO"],
+    parser.add_argument('--algorithm', type=str, choices=["SPDO", "SADO"],
                         required=False, default="SPDO")
     parser.add_argument('--meta_iterations', type=int, required=False, default=500)
     parser.add_argument('--is_mcbr', action='store_true')  # on/off flag
@@ -349,7 +363,7 @@ if __name__ == '__main__':
     game_name = commandline_args.game_name
     meta_iterations = commandline_args.meta_iterations
     iterations = 100000
-    data_collect_frequency = 1000
+    data_collect_frequency = 100
     is_warm_start = commandline_args.is_warm_start
     is_mcbr = commandline_args.is_mcbr
     out_dir = commandline_args.out_dir
