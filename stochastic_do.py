@@ -9,6 +9,10 @@ import numpy as np
 from tqdm import tqdm
 from copy import deepcopy
 import blotto
+import blotto_20
+import blotto_25
+import blotto_30
+import blotto_40
 import pdb
 
 import large_kuhn_poker
@@ -190,6 +194,14 @@ class SPDO:
             game = pyspiel.load_game(game_name)
         elif game_name == "blotto":
             game = blotto.BlottoGame()
+        elif game_name == "blotto_20":
+            game = blotto_20.BlottoGame()
+        elif game_name == "blotto_25":
+            game = blotto_25.BlottoGame()   
+        elif game_name == "blotto_30":
+            game = blotto_30.BlottoGame()
+        elif game_name == "blotto_40":
+            game = blotto_40.BlottoGame()
         elif game_name == "python_large_kuhn_poker":
             game = large_kuhn_poker.KuhnPokerGame()
         else:
@@ -199,6 +211,7 @@ class SPDO:
         return game
 
     def warm_star_init(self, old_solver, new_solver, br_list):
+
         for key, legal_action_value in old_solver.legal_actions_dict.items():
             cur_player, old_legal_actions = legal_action_value
 
@@ -353,9 +366,9 @@ if __name__ == '__main__':
     parser.add_argument('--seed', type=int, required=False, default=0)
     parser.add_argument('-w', '--is_warm_start', action='store_true')  # on/off flag
     parser.add_argument('--game_name', type=str, required=False, default="kuhn_poker",
-                        choices=["leduc_poker", "kuhn_poker", "leduc_poker_dummy", "oshi_zumo", "liars_dice",
+                        choices=["leduc_poker", "kuhn_poker", "leduc_poker_10_card","leduc_poker_dummy", "oshi_zumo", "liars_dice",
                                  "python_large_kuhn_poker",
-                                 "blotto"])
+                                 "blotto", "blotto_20", "blotto_25", "blotto_30", "blotto_40"])
     commandline_args = parser.parse_args()
 
     seed = commandline_args.seed

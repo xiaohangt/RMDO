@@ -11,6 +11,10 @@ import pdb
 import numpy as np
 import pyspiel
 import blotto
+import blotto_20
+import blotto_25
+import blotto_30
+import blotto_40
 import large_kuhn_poker
 from utils import get_support
 
@@ -71,8 +75,8 @@ if __name__ == '__main__':
     # dxdo is xdo with meta_solver cfr+
     parser.add_argument('--algorithm', type=str, choices=["psro", "cfr", "xfp", "xdo", "dxdo", "cfr_plus", "lcfr", "outcome_sampling_mccfr"], default="outcome_sampling_mccfr")
     parser.add_argument('--game_name', type=str, required=False, default="kuhn_poker",
-                        choices=["leduc_poker", "kuhn_poker", "leduc_poker_dummy", "oshi_zumo",  "liars_dice",
-                                 "goofspiel", "havannah", "blotto", "python_large_kuhn_poker"])
+                        choices=["leduc_poker", "leduc_poker_10_card","kuhn_poker", "leduc_poker_dummy", "oshi_zumo",  "liars_dice",
+                                 "goofspiel", "blotto", "blotto_20","blotto_25","blotto_30","blotto_40","python_large_kuhn_poker"])
     parser.add_argument('--display', type=bool, default=False)
     parser.add_argument('--seed', type=int, required=False, default=0)
     parser.add_argument('--out_dir', type=str, required=False, default="results")  # output folder
@@ -105,6 +109,14 @@ if __name__ == '__main__':
         game = pyspiel.load_game(game_name)
     elif game_name == "blotto":
         game = blotto.BlottoGame()
+    elif game_name =="blotto_20":
+        game = blotto_20.BlottoGame()
+    elif game_name =="blotto_25":
+        game = blotto_25.BlottoGame()
+    elif game_name =="blotto_30":
+        game = blotto_30.BlottoGame()
+    elif game_name =="blotto_40":
+        game = blotto_40.BlottoGame()
     elif game_name == "python_large_kuhn_poker":
         game = large_kuhn_poker.KuhnPokerGame()
     else:
@@ -217,7 +229,7 @@ if __name__ == '__main__':
             for j in range(xdo_iterations):
                 cfr_br_solver.evaluate_and_update_policy()
                 episode += 1
-                if j % 50 == 0:
+                if j % 50 == 1:
                     br_list_conv = exploitability_br_actions.exploitability(game, br_list,
                                                                             cfr_br_solver.average_policy())
                     num_infostates += cfr_br_solver.num_infostates_expanded / j # add the complexity of computing exps in restricted games

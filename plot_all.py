@@ -28,7 +28,11 @@ def set_plot(legend_size=None):
     plt.rc('legend', fontsize=SMALL_SIZE*legend_size)    # legend fontsize
     plt.rc('figure', titlesize=BIGGER_SIZE)  # fontsize of the figure title
 
-game_name_dict = {"python_large_kuhn_poker": "Large Kuhn Poker", "liars_dice": "Liars Dice", "leduc_poker": "Leduc Poker", "leduc_poker_dummy": "Leduc Poker Dummy", "kuhn_poker": "Kuhn Poker", "oshi_zumo": "Oshi Zumo"}
+game_name_dict = {"python_large_kuhn_poker": "Large Kuhn Poker", "blotto_20":"Blotto 20","blotto_25":"Blotto 25",
+                  "blotto_30":"Blotto 30","blotto_40":"Blotto 40",
+                  "liars_dice": "Liars Dice", "leduc_poker": "Leduc Poker", 
+                  "leduc_poker_dummy": "Leduc Poker Dummy", "kuhn_poker": "Kuhn Poker",
+                    "oshi_zumo": "Oshi Zumo", "leduc_poker_10_card":"Leduc Poker 10 Card"}
 
 def get_algo_name(raw_algo_name, num_iteration=1, is_warm_start=False, is_mcbr="", sto_do=False):
     name_dict = {"dxdo":"XDO", "AdaDO":"AdaDO", "outcome_sampling_mccfr": "MCCFR"}
@@ -253,8 +257,8 @@ def get_sto_methods_data(out_dir, num_seeds, env_name, algorithm_name, num_itera
         writer.writerow(results)
 
 
-def plot_mean_curve_with_error_bars(ax, num_seeds, env_name, algorithm_name, num_iteration, is_warm_start, color, max_x_axis, base=False, is_mcbr=""):
-    save_prefix = '/root/data/results_sto/' if algorithm_name == "SADO" else '/root/data/results/'
+def plot_mean_curve_with_error_bars(ax, num_seeds, env_name, algorithm_name, num_iteration, is_warm_start, is_avg_warm, color, max_x_axis, base=False, is_mcbr=""):
+    save_prefix = '/home/vipuser/Documents/RMDO/results/'
     # Initialize lists to store interpolated data for each seed
     interp_seeds = []
     seed_x_values = []
@@ -266,11 +270,13 @@ def plot_mean_curve_with_error_bars(ax, num_seeds, env_name, algorithm_name, num
         if base:
             data_filename = save_prefix + algorithm_name + '_' + env_name + f"_{seed}__exps.npy"
             x_filename = save_prefix + algorithm_name + '_' + env_name + f"_{seed}__infostates.npy"
-
-        else:
-            # f'/root/data/results/{self.game_name}_{self.algorithm}_{self.meta_iterations}_ws{self.is_warm_start}_{seed}'
+        elif algorithm_name=="SPDO":
             data_filename = f'{save_prefix}{env_name}_{algorithm_name}_{num_iteration}_ws{is_warm_start}{is_mcbr}_{seed}_exps.npy'
             x_filename = f'{save_prefix}{env_name}_{algorithm_name}_{num_iteration}_ws{is_warm_start}{is_mcbr}_{seed}_infostates.npy'
+        else:
+            # f'/root/data/results/{self.game_name}_{self.algorithm}_{self.meta_iterations}_ws{self.is_warm_start}_{seed}'
+            data_filename = f'{save_prefix}{env_name}_{algorithm_name}_{num_iteration}_ws{is_warm_start}{is_mcbr}_avg{is_avg_warm}_0.1_{seed}_exps.npy'
+            x_filename = f'{save_prefix}{env_name}_{algorithm_name}_{num_iteration}_ws{is_warm_start}{is_mcbr}_avg{is_avg_warm}_0.1_{seed}_infostates.npy'
    
         if data_filename == "/root/data/results/leduc_poker_SPDO_100_wsFalse_4_exps.npy":
             return 
@@ -307,7 +313,7 @@ def plot_mean_curve_with_error_bars(ax, num_seeds, env_name, algorithm_name, num
     ax.fill_between(x_sequence, mean_data - std_dev_data, mean_data + std_dev_data, alpha=0.08, color=color)
 
 # colors = generate_distinct_colors(50)
-colors = matplotlib.cm.tab10(range(10))
+colors = matplotlib.cm.tab10(range(20))
 
 
 ##################### Example usage of plotting stochastic methods: #####################
@@ -327,36 +333,38 @@ def run_get_sto_methods_data(out_dir):
         get_sto_methods_data(out_dir, 5, env_name, "outcome_sampling_mccfr", 1, True, base=True)
         
 
-
 def run_plot_sto_methods():
-    num_seeds = 100  # Replace with the actual number of seeds
+    num_seeds = 1  # Replace with the actual number of seeds
     env_name = "your_env_name"  # Replace with your environment name
     algorithm_name = "your_algorithm_name"  # Replace with your algorithm name
     num_iteration = 1000  # Replace with the number of iterations
     is_warm_start = True  # Replace with True or False as needed
     legend_done = False
-    max_x_axis_dict = {"kuhn_poker": 1e7, "python_large_kuhn_poker":2e7, "leduc_poker": 2e8, "leduc_poker_dummy": 1e9, "liars_dice": 1e9, "oshi_zumo":1e9}
+    max_x_axis_dict = {"blotto_20":1e7, "blotto_25":1e7, "blotto_30":1e8, "blotto_40":1e8,"leduc_poker_10_card":2e8,
+                       "kuhn_poker": 1e7, "python_large_kuhn_poker":2e7, "leduc_poker": 2e8, "leduc_poker_dummy": 1e9, "liars_dice": 1e9, "oshi_zumo":1e9}
     set_plot()
-    fig, axs = plt.subplots(1, 3, figsize=(15 * 3, 8))
+    fig, axs = plt.subplots(1, 5, figsize=(15 * 3, 8))
 
-    for j, env_name in enumerate(["kuhn_poker", "python_large_kuhn_poker", "leduc_poker", ]): #, "leduc_poker_dummy", "liars_dice", "oshi_zumo"]:
+    for j, env_name in enumerate(["leduc_poker_10_card", "blotto_20", "blotto_25", "blotto_30","blotto_40" ]): #, "leduc_poker_dummy", "liars_dice", "oshi_zumo"]:
         ax = axs[j]
         i = 0
 
-        for algorithm_name in ["SPDO"]:
+        for algorithm_name in ["PDO"]:
 
-            for num_iteration in [1000, 5000]: #, 1000, 5000, 10000]:
-                plot_mean_curve_with_error_bars(ax, 5, env_name, algorithm_name, num_iteration, False, colors[i], max_x_axis=max_x_axis_dict[env_name])
+            for num_iteration in [50, 100]: #, 1000, 5000, 10000]:
+                plot_mean_curve_with_error_bars(ax, 1, env_name, algorithm_name, num_iteration, False,False, colors[i], max_x_axis=max_x_axis_dict[env_name])
                 i += 1
-                plot_mean_curve_with_error_bars(ax, 5, env_name, algorithm_name, num_iteration, True, colors[i], max_x_axis=max_x_axis_dict[env_name])
+                plot_mean_curve_with_error_bars(ax, 1, env_name, algorithm_name, num_iteration, True,False, colors[i], max_x_axis=max_x_axis_dict[env_name])
                 i += 1
-
-        for algo_name in ["SADO"]:
+        plot_mean_curve_with_error_bars(ax, 1, env_name, "XODO", 1, False,False, colors[i], max_x_axis=max_x_axis_dict[env_name])
+        plot_mean_curve_with_error_bars(ax, 1, env_name, "SPDO", 5000, False,False, colors[i], max_x_axis=max_x_axis_dict[env_name])
+        plot_mean_curve_with_error_bars(ax, 1, env_name, "SPDO", 1000, False,False, colors[i], max_x_axis=max_x_axis_dict[env_name])
+        for algo_name in ["xdo", "outcome_sampling_mccfr", "lcfr"]:
             for ws in [False]:
-                plot_mean_curve_with_error_bars(ax, 5, env_name, algo_name, 500, ws, colors[i], max_x_axis=max_x_axis_dict[env_name])
+                plot_mean_curve_with_error_bars(ax, 1, env_name, algo_name, 500, ws, False, colors[i], max_x_axis=max_x_axis_dict[env_name],base=True)
                 i += 1
         
-        plot_mean_curve_with_error_bars(ax, 5, env_name, "outcome_sampling_mccfr", num_iteration, False, colors[i], max_x_axis=max_x_axis_dict[env_name], base=True)
+        #plot_mean_curve_with_error_bars(ax, 1, env_name, "outcome_sampling_mccfr", num_iteration, False, False,colors[i], max_x_axis=max_x_axis_dict[env_name], base=True)
         
         ax.set_yscale("log")
         ax.set_title(f'{game_name_dict[env_name]}')
@@ -366,10 +374,10 @@ def run_plot_sto_methods():
         elif env_name == "kuhn_poker":
             ax.set_ylabel('Exploitability')
         else:
-            ax.set_ylim([1e-2, 10])
-        # plt.legend(loc='lower right') #, bbox_to_anchor=(1.5, 1.5), fancybox=True, shadow=True, ncol=5)
+            ax.set_ylim([1e-1, 100])
+        plt.legend(loc='lower right') #, bbox_to_anchor=(1.5, 1.5), fancybox=True, shadow=True, ncol=5)
         ax.grid(True)
-    fig.savefig(f"results_figs/stochastic_new.pdf", bbox_inches='tight', dpi=200, transparent=True)
+    fig.savefig(f"results/stochastic_new.pdf", bbox_inches='tight', dpi=200, transparent=True)
 
 
 if __name__ == '__main__':

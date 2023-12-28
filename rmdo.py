@@ -7,6 +7,10 @@ import argparse
 import numpy as np
 from copy import deepcopy
 import blotto
+import blotto_20
+import blotto_25
+import blotto_30
+import blotto_40
 import pdb
 import large_kuhn_poker
 from utils import get_support, ensure_dir, merge_two_policies   
@@ -137,6 +141,14 @@ class RMDO:
             game = pyspiel.load_game(game_name)
         elif game_name == "blotto":
             game = blotto.BlottoGame()
+        elif game_name == "blotto_20":
+            game = blotto_20.BlottoGame()
+        elif game_name == "blotto_25":
+            game = blotto_25.BlottoGame()
+        elif game_name == "blotto_30":
+            game = blotto_30.BlottoGame()
+        elif game_name == "blotto_40":
+            game = blotto_40.BlottoGame()
         elif game_name == "python_large_kuhn_poker":
             game = large_kuhn_poker.KuhnPokerGame()
         else:
@@ -314,10 +326,8 @@ if __name__ == '__main__':
     parser.add_argument('--delta', type=str, required=False, default="0.1")  # warm start discount
     parser.add_argument('--out_dir', type=str, required=False, default="results")  # output folder
     parser.add_argument('--seed', type=int, required=False, default=0) 
-    parser.add_argument('--game_name', type=str, required=False, default="kuhn_poker",
-                        choices=["leduc_poker", "kuhn_poker", "leduc_poker_dummy", "oshi_zumo", "liars_dice",
-                                 "goofspiel", "python_large_kuhn_poker",
-                                 "phantom_ttt", "blotto"])
+    parser.add_argument('--game_name', type=str, required=False, default="blotto_20",
+                        choices=[ "leduc_poker_10_card", "blotto_20", "blotto_25", "blotto_30", "blotto_40"])
     commandline_args = parser.parse_args()
 
     seed = commandline_args.seed
