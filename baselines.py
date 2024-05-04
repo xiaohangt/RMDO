@@ -1,14 +1,12 @@
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
 import os
 import argparse
+
 import datetime
 import time
 import pickle
 import pdb
 import numpy as np
+
 import pyspiel
 import blotto
 import blotto_20
@@ -16,6 +14,7 @@ import blotto_25
 import blotto_30
 import blotto_40
 import large_kuhn_poker
+import kuhn_poker_dummy
 from utils import get_support
 
 from dependencies.open_spiel.python.algorithms import cfr
@@ -71,12 +70,13 @@ def _policy_dict_at_state(callable_policy, state):
 
 
 if __name__ == '__main__':
+    print("here")
     parser = argparse.ArgumentParser()
     # dxdo is xdo with meta_solver cfr+
     parser.add_argument('--algorithm', type=str, choices=["psro", "cfr", "xfp", "xdo", "dxdo", "cfr_plus", "lcfr", "outcome_sampling_mccfr"], default="outcome_sampling_mccfr")
     parser.add_argument('--game_name', type=str, required=False, default="kuhn_poker",
                         choices=["leduc_poker", "leduc_poker_10_card","kuhn_poker", "leduc_poker_dummy", "oshi_zumo",  "liars_dice",
-                                 "goofspiel", "blotto", "blotto_20","blotto_25","blotto_30","blotto_40","python_large_kuhn_poker"])
+                                 "goofspiel", "blotto", "blotto_20","blotto_25","blotto_30","blotto_40","python_large_kuhn_poker","kuhn_poker_dummy"])
     parser.add_argument('--display', type=bool, default=False)
     parser.add_argument('--seed', type=int, required=False, default=0)
     parser.add_argument('--out_dir', type=str, required=False, default="results")  # output folder
@@ -119,6 +119,8 @@ if __name__ == '__main__':
         game = blotto_40.BlottoGame()
     elif game_name == "python_large_kuhn_poker":
         game = large_kuhn_poker.KuhnPokerGame()
+    elif game_name =="kuhn_poker_dummy":
+        game = kuhn_poker_dummy.KuhnPokerGame()
     else:
         game = pyspiel.load_game(game_name, {"players": pyspiel.GameParameter(2)})
 

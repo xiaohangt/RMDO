@@ -2,10 +2,14 @@ import os
 import gc
 import sys
 import time
-import pyspiel
 import argparse
 import datetime
+import pdb
 import numpy as np
+import pyspiel
+
+
+
 from tqdm import tqdm
 from copy import deepcopy
 import blotto
@@ -13,7 +17,7 @@ import blotto_20
 import blotto_25
 import blotto_30
 import blotto_40
-import pdb
+import kuhn_poker_dummy
 
 import large_kuhn_poker
 from dependencies.open_spiel.python.algorithms import get_all_states
@@ -106,6 +110,7 @@ class MetaGame:
     def __getattr__(self, attr):
         assert attr != 'new_initial_state'
         return self.game.__getattribute__(attr)
+    
 
 
 class ExpandTabularPolicy:
@@ -210,11 +215,18 @@ class SPDO:
         self.game_size = len(get_all_states.get_all_states(game, include_chance_states=True))
         return game
 
-    def warm_star_init(self, old_solver, new_solver, br_list):
-
+    def warm_star_init(self, restricted_game, old_solver, new_solver, br_list):
+        ws_actions_cnt = 0
+        ws_real_cnt=0
         for key, legal_action_value in old_solver.legal_actions_dict.items():
-            cur_player, old_legal_actions = legal_action_value
+            cur_player, old_legal_actions, state = legal_action_value
+            
+            #modified
+            #state_old = state.clone()
+            state.state.game = deepcopy(restricted_game.game)
+            
 
+            
             legal_actions = set()
             for br in br_list[cur_player]:
                 legal_actions.add(br.best_response_action(key))
@@ -228,16 +240,24 @@ class SPDO:
             value = old_solver._infostates[key]
             count = 0
             for i, action in enumerate(legal_actions):
+                #modified
                 if action in old_legal_actions:
-                    new_solver._infostates[key][0][i] = value[0][count] / self.meta_iterations
+                    if not state.child(action).is_terminal():
+                        new_solver._infostates[key][0][i] = value[0][count] / self.meta_iterations
+                        ws_real_cnt+=1
                     count += 1
-            
+                    #if not state_old.child(action).is_terminal():
+                        #ws_actions_cnt+=1
+        #if ws_real_cnt!=ws_actions_cnt:
+            #print(f"has some differences: new {ws_real_cnt};old {ws_actions_cnt}")
+            #sys.exit(0)
+        
     def reset_meta_solver(self, restricted_game, br_list=None, old_solver=None):
         meta_solver = WrappedOSMCCFRSolver(restricted_game)
         if (not old_solver) or (not self.is_warm_start):
             return meta_solver
-
-        self.warm_star_init(old_solver, meta_solver, br_list)
+        # modified
+        self.warm_star_init(restricted_game, old_solver, meta_solver, br_list)
         return meta_solver
     
     def get_best_response(self, game, policy):
@@ -294,11 +314,12 @@ class SPDO:
         restricted_game = MetaGame(game, br_list, it=0)
         meta_solver = self.reset_meta_solver(restricted_game)
         current_window_policy = ExpandTabularPolicy(meta_solver.average_policy())
-
+        tol=0.1
+        alpha=0.5
         for i in range(iterations):
             avg_policy = current_window_policy
 
-            conv = exploitability.exploitability(game, avg_policy)
+            conv,num_infostate_expanded = exploitability.exploitability(game, avg_policy)
             # conv = mc_exploitability(game, avg_policy)
             mcbr_str = "_mcbr" if self.is_mcbr else ""
             save_prefix = f'{self.out_dir}/{self.game_name}_{self.algorithm}_{self.meta_iterations}_ws{self.is_warm_start}{mcbr_str}_{seed}'
@@ -331,15 +352,27 @@ class SPDO:
                 all_states, depth_h, max_a = get_all_states.get_all_statistics(restricted_game, include_chance_states=False)
                 s_j = len(all_states)
                 if is_mcbr:
-                    frequency = np.rint(np.sqrt(s_j^3 * max_a)) * 0.1
+                    frequency = np.rint(np.sqrt(s_j^3 * max_a)) * 1.#modified
                 else:
-                    frequency = np.rint(s_j * np.sqrt(max_a) / depth_h) * 0.1
+                    frequency = np.rint(s_j * np.sqrt(max_a) / depth_h) * 1.#modified
             else:
                 frequency = self.meta_iterations
 
             meta_solver.num_infostates_expanded = 0
+            convs = []
+            frequency = max(frequency,800)
+            
             for _ in range(int(frequency)):
                 meta_solver.evaluate_and_update_policy()
+                if _%100==0:
+                    conv,num_infostate_expanded = exploitability.exploitability(game,ExpandTabularPolicy(meta_solver.average_policy()))
+                    num_infostates += num_infostate_expanded
+                    convs.append(conv)
+                    #if len(convs)>10 and (np.mean(convs[-8:])-convs[-1])/np.mean(convs[-8:])<tol:
+                    if len(convs)>1 and (convs[-2]-convs[-1])/convs[-2]<tol:
+                        tol *=alpha
+                        break
+                    
             num_infostates += meta_solver.num_infostates_expanded
 
             # Compute BR
@@ -367,7 +400,7 @@ if __name__ == '__main__':
     parser.add_argument('-w', '--is_warm_start', action='store_true')  # on/off flag
     parser.add_argument('--game_name', type=str, required=False, default="kuhn_poker",
                         choices=["leduc_poker", "kuhn_poker", "leduc_poker_10_card","leduc_poker_dummy", "oshi_zumo", "liars_dice",
-                                 "python_large_kuhn_poker",
+                                 "python_large_kuhn_poker","kuhn_poker_dummy",
                                  "blotto", "blotto_20", "blotto_25", "blotto_30", "blotto_40"])
     commandline_args = parser.parse_args()
 
