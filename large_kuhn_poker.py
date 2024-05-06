@@ -99,9 +99,9 @@ class KuhnPokerState(pyspiel.State):
     def current_player(self):
         """Returns id of the next player to move, or TERMINAL if game is over."""
         if self._game_over:
-            return pyspiel.PlayerId.TERMINAL
+            return int(pyspiel.PlayerId.TERMINAL)
         elif len(self.cards) < _NUM_PLAYERS:
-            return pyspiel.PlayerId.CHANCE
+            return int(pyspiel.PlayerId.CHANCE)
         else:
             return self._next_player
 
@@ -187,7 +187,7 @@ class KuhnPokerObserver:
             if iig_obs_type.perfect_recall:
                 pieces.append(("betting", 3 * _POT, (3, _POT)))
             else:
-                pieces.append(("pot_contribution", _POT, (_POT,)))
+                pieces.append(("pot_contribution", 2, (2,)))
 
         # Build the single flat tensor.
         total_size = sum(size for name, size, shape in pieces)
